@@ -1,6 +1,6 @@
 ''' 
     DOFUS 3.0 / Touch Upgrade
-    Script pour calculer les ressources manquantes, ajouter des recettes, gérer l'inventaire, mettre à jour les valeurs des ressources et gérer la fortune personnelle.
+    Script pour calculer les ressources manquantes, ajouter des recettes, gérer l'inventaire, mettre à jour les valeurs des ressources.
 '''
 
 from tabulate import tabulate
@@ -34,9 +34,6 @@ inventory = {
     "cuir_de_peunch": 0,
     "etoffe_de_cuirasse": 0,
 }
-
-# Variable globale pour la fortune personnelle
-current_kamas = 3700000  # Valeur initiale en kamas
 
 # Fonction pour calculer les ressources manquantes et leur coût
 def calculate_missing_resources(recipe_name, resources):
@@ -81,63 +78,6 @@ def show_results(recipe_name, table_text, kamas_manquant):
     # Bouton pour fermer la fenêtre
     close_button = tk.Button(result_window, text="Fermer", command=result_window.destroy)
     close_button.pack(pady=10)
-
-# Fonction pour ajouter une nouvelle recette
-def add_recipe():
-    global recipe_combobox  # Make recipe_combobox accessible
-    def save_recipe():
-        try:
-            # Récupérer le nom de la recette
-            recipe_name = recipe_name_entry.get().strip()
-            if not recipe_name:
-                raise ValueError("Le nom de la recette ne peut pas être vide.")
-            if recipe_name in recipes:
-                raise ValueError("Cette recette existe déjà.")
-
-            # Récupérer les ressources
-            resources_text = resources_text_widget.get("1.0", "end").strip()
-            if not resources_text:
-                raise ValueError("Les ressources ne peuvent pas être vides.")
-
-            # Convertir les ressources en dictionnaire
-            resources = {}
-            for line in resources_text.split("\n"):
-                parts = line.split(",")
-                if len(parts) != 3:
-                    raise ValueError("Format incorrect. Utilisez : nom, requis, valeur")
-                resource_name = parts[0].strip()
-                needed = int(parts[1].strip())
-                value = int(parts[2].strip())
-                resources[resource_name] = {"needed": needed, "value": value}
-
-            # Ajouter la recette au dictionnaire
-            recipes[recipe_name] = resources
-            recipe_combobox["values"] = list(recipes.keys())  # Mettre à jour la liste déroulante
-            messagebox.showinfo("Succès", f"La recette '{recipe_name}' a été ajoutée avec succès.")
-            add_recipe_window.destroy()
-        except ValueError as e:
-            messagebox.showerror("Erreur", str(e))
-
-    # Fenêtre pour ajouter une recette
-    add_recipe_window = tk.Toplevel()
-    add_recipe_window.title("Ajouter une nouvelle recette")
-
-    # Centrer la fenêtre
-    center_window(add_recipe_window)
-
-    # Entrée pour le nom de la recette
-    tk.Label(add_recipe_window, text="Nom de la recette :", font=("Arial", 12)).pack(pady=5)
-    recipe_name_entry = tk.Entry(add_recipe_window, width=40, font=("Arial", 12))
-    recipe_name_entry.pack(pady=5)
-
-    # Zone de texte pour les ressources
-    tk.Label(add_recipe_window, text="Ressources (format : nom, requis, valeur) :", font=("Arial", 12)).pack(pady=5)
-    resources_text_widget = tk.Text(add_recipe_window, width=50, height=10, font=("Arial", 12))
-    resources_text_widget.pack(pady=5)
-
-    # Bouton pour sauvegarder
-    save_button = tk.Button(add_recipe_window, text="Sauvegarder", command=save_recipe, font=("Arial", 12))
-    save_button.pack(pady=10)
 
 # Fonction pour centrer une fenêtre
 def center_window(window):
@@ -199,6 +139,46 @@ def update_resource_values():
     save_button = tk.Button(update_window, text="Sauvegarder", command=save_updates, font=("Arial", 12))
     save_button.pack(pady=10)
 
+# Fonction pour gérer l'inventaire
+def manage_inventory():
+    def save_inventory():
+        try:
+            inventory_text = inventory_text_widget.get("1.0", "end").strip()
+            if not inventory_text:
+                raise ValueError("L'inventaire ne peut pas être vide.")
+            for line in inventory_text.split("\n"):
+                parts = line.split(",")
+                if len(parts) != 2:
+                    raise ValueError("Format incorrect. Utilisez : nom, quantité")
+                resource_name = parts[0].strip()
+                quantity = int(parts[1].strip())
+                if resource_name not in inventory:
+                    raise ValueError(f"Ressource '{resource_name}' introuvable dans l'inventaire.")
+                inventory[resource_name] = quantity
+            messagebox.showinfo("Succès", "L'inventaire a été mis à jour.")
+            inventory_window.destroy()
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
+
+    # Fenêtre pour gérer l'inventaire
+    inventory_window = tk.Toplevel()
+    inventory_window.title("Gérer l'inventaire")
+
+    # Centrer la fenêtre
+    center_window(inventory_window)
+
+    # Zone de texte pour l'inventaire
+    tk.Label(inventory_window, text="Inventaire (format : nom, quantité) :", font=("Arial", 12)).pack(pady=5)
+    inventory_text_widget = tk.Text(inventory_window, width=50, height=15, font=("Arial", 12))
+    inventory_text_widget.pack(pady=5)
+
+    # Pré-remplir avec les ressources existantes
+    inventory_text_widget.insert("1.0", "\n".join([f"{resource}, {quantity}" for resource, quantity in inventory.items()]))
+
+    # Bouton pour sauvegarder
+    save_button = tk.Button(inventory_window, text="Sauvegarder", command=save_inventory, font=("Arial", 12))
+    save_button.pack(pady=10)
+
 # Fonction principale pour l'interface graphique
 def main_gui():
     def on_calculate():
@@ -219,18 +199,19 @@ def main_gui():
 
     # Fenêtre principale
     root = tk.Tk()
-    root.title("Calculateur de Recettes DOFUS")
-    root.geometry("840x460")  # Taille fixe de la fenêtre
+    root.title("Dofus Touch Calculator")
+    root.resizable(False, False)  # Empêcher le redimensionnement de la fenêtre
+    root.geometry("1200x800")  # Taille fixe de la fenêtre
     center_window(root)
 
     # Télécharger et charger l'image de fond
-    image_url = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR3aJKGjBvG53T_9XuPu4UXTCIMb9fVqjRmug&s"
+    image_url = "https://github.com/Neo-code769/DofusTouch-Calculator/blob/main/DofusTouchCalculator-background.png?raw=true"
     response = requests.get(image_url, stream=True)
     response.raw.decode_content = True
     background_image = Image.open(response.raw)
 
-    # Redimensionner l'image à 840x460 pixels
-    background_image = background_image.resize((840, 460))
+    # Redimensionner l'image à 1200x800 pixels
+    background_image = background_image.resize((1200, 800))
 
     # Convertir l'image pour tkinter
     background_photo = ImageTk.PhotoImage(background_image)
@@ -245,15 +226,6 @@ def main_gui():
     style.configure("TLabel", font=("Arial", 14), background="#f0f0f0", borderwidth=0)
     style.configure("TCombobox", font=("Arial", 12))
 
-    # Label pour le titre
-    title_label = tk.Label(root, text="Dofus Calculator :", font=("Arial", 18, "bold"), bg="#f0f0f0", borderwidth=0)
-    title_label.pack(pady=10)
-
-    # Label pour la fortune actuelle
-    global current_kamas
-    kamas_label = tk.Label(root, text=f"Fortune actuelle : {current_kamas:,} kamas".replace(",", " "), font=("Arial", 14), bg="#f0f0f0", borderwidth=0)
-    kamas_label.pack(pady=5)
-
     # Liste déroulante pour les recettes
     recipe_names = list(recipes.keys())
     recipe_combobox = ttk.Combobox(root, values=recipe_names, state="readonly", width=50, font=("Arial", 12))
@@ -264,35 +236,12 @@ def main_gui():
     calculate_button = ttk.Button(root, text="Calculer", command=on_calculate)
     calculate_button.pack(pady=10)
 
-    # Fonction pour gérer l'inventaire
-    def manage_inventory():
-        messagebox.showinfo("Gérer l'inventaire", "Cette fonctionnalité n'est pas encore implémentée.")
-
     # Bouton pour gérer l'inventaire
     manage_inventory_button = ttk.Button(root, text="Gérer l'inventaire", command=manage_inventory)
     manage_inventory_button.pack(pady=10)
 
-    # Bouton pour ajouter une recette
-    add_recipe_button = ttk.Button(root, text="Ajouter une recette", command=add_recipe)
-    add_recipe_button.pack(pady=10)
-
-    # Fonction pour mettre à jour la fortune personnelle
-    def update_kamas():
-        global current_kamas
-        try:
-            new_kamas = int(tk.simpledialog.askstring("Mettre à jour ma fortune", "Entrez votre nouvelle fortune en kamas :"))
-            current_kamas = new_kamas
-            kamas_label.config(text=f"Fortune actuelle : {current_kamas:,} kamas".replace(",", " "))
-            messagebox.showinfo("Succès", "Votre fortune a été mise à jour avec succès.")
-        except (ValueError, TypeError):
-            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide.")
-
-    # Bouton pour mettre à jour la fortune personnelle
-    update_kamas_button = ttk.Button(root, text="Mettre à jour ma fortune", command=update_kamas)
-    update_kamas_button.pack(pady=10)
-
     # Bouton pour mettre à jour les valeurs des ressources
-    update_resources_button = ttk.Button(root, text="Mettre à jour les ressources", command=update_resource_values)
+    update_resources_button = ttk.Button(root, text="Mettre à jour la valeur des ressources", command=update_resource_values)
     update_resources_button.pack(pady=10)
 
     # Lancer la boucle principale
