@@ -1,13 +1,15 @@
 ''' 
-    DOFUS 3.0 / Touch Upgrade
+    DOFUS 1.4 / Touch Upgrade
     Script pour calculer les ressources manquantes, ajouter des recettes, gérer l'inventaire, mettre à jour les valeurs des ressources.
 '''
 
 from tabulate import tabulate
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import messagebox, simpledialog
 from PIL import Image, ImageTk  # Pour gérer l'image de fond
 import requests  # Pour télécharger l'image depuis l'URL
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 
 # Définir les recettes et leurs ressources
 recipes = {
@@ -61,23 +63,42 @@ def calculate_missing_resources(recipe_name, resources):
 def show_results(recipe_name, table_text, kamas_manquant):
     result_window = tk.Toplevel()
     result_window.title(f"Résultats pour {recipe_name}")
+    result_window.geometry("800x600")  # Taille initiale
+    result_window.resizable(True, True)  # Permettre le redimensionnement
 
     # Centrer la fenêtre
     center_window(result_window)
 
-    # Afficher le tableau
-    text_widget = tk.Text(result_window, wrap="none", width=100, height=20)
+    # Cadre principal
+    result_frame = ttk.Frame(result_window, padding=10)
+    result_frame.pack(fill="both", expand=True)
+
+    # Afficher le tableau avec une scrollbar
+    text_widget = tk.Text(result_frame, wrap="none", width=100, height=20, font=("Courier", 10))
     text_widget.insert("1.0", table_text)
     text_widget.config(state="disabled")  # Rendre le texte non modifiable
-    text_widget.pack(padx=10, pady=10)
+
+    # Scrollbars
+    scrollbar_y = ttk.Scrollbar(result_frame, orient="vertical", command=text_widget.yview)
+    scrollbar_x = ttk.Scrollbar(result_frame, orient="horizontal", command=text_widget.xview)
+    text_widget.config(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+    # Placement des widgets
+    text_widget.grid(row=0, column=0, sticky="nsew")
+    scrollbar_y.grid(row=0, column=1, sticky="ns")
+    scrollbar_x.grid(row=1, column=0, sticky="ew")
 
     # Afficher le coût total manquant
-    total_label = tk.Label(result_window, text=f"Il me manque : {kamas_manquant:,}".replace(",", " ") + " kamas", font=("Arial", 12, "bold"))
-    total_label.pack(pady=10)
+    total_label = ttk.Label(result_frame, text=f"Il me manque : {kamas_manquant:,} kamas".replace(",", " "), font=("Arial", 12, "bold"))
+    total_label.grid(row=2, column=0, columnspan=2, pady=10)
 
     # Bouton pour fermer la fenêtre
-    close_button = tk.Button(result_window, text="Fermer", command=result_window.destroy)
-    close_button.pack(pady=10)
+    close_button = ttk.Button(result_frame, text="Fermer", command=result_window.destroy, bootstyle="danger")
+    close_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+    # Configurer la grille
+    result_frame.rowconfigure(0, weight=1)
+    result_frame.columnconfigure(0, weight=1)
 
 # Fonction pour centrer une fenêtre
 def center_window(window):
@@ -120,14 +141,28 @@ def update_resource_values():
     # Fenêtre pour mettre à jour les ressources
     update_window = tk.Toplevel()
     update_window.title("Mettre à jour les valeurs des ressources")
+    update_window.geometry("800x600")  # Taille initiale
+    update_window.resizable(True, True)  # Permettre le redimensionnement
 
     # Centrer la fenêtre
     center_window(update_window)
 
-    # Zone de texte pour les mises à jour
-    tk.Label(update_window, text="Mises à jour (format : nom, nouvelle valeur) :", font=("Arial", 12)).pack(pady=5)
-    updates_text_widget = tk.Text(update_window, width=50, height=15, font=("Arial", 12))
-    updates_text_widget.pack(pady=5)
+    # Cadre principal
+    update_frame = ttk.Frame(update_window, padding=10)
+    update_frame.pack(fill="both", expand=True)
+
+    # Label d'instructions
+    instructions_label = ttk.Label(
+        update_frame,
+        text="Mises à jour (format : nom, nouvelle valeur) :",
+        font=("Arial", 12, "bold"),
+        anchor="center"
+    )
+    instructions_label.pack(pady=10)
+
+    # Zone de texte pour les mises à jour avec scrollbars
+    updates_text_widget = tk.Text(update_frame, wrap="none", width=70, height=20, font=("Courier", 10))
+    updates_text_widget.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
     # Pré-remplir avec les ressources existantes
     existing_resources = set()
@@ -135,9 +170,22 @@ def update_resource_values():
         existing_resources.update(recipe.keys())
     updates_text_widget.insert("1.0", "\n".join([f"{resource}, 0" for resource in existing_resources]))
 
+    # Scrollbars
+    scrollbar_y = ttk.Scrollbar(update_frame, orient="vertical", command=updates_text_widget.yview)
+    scrollbar_x = ttk.Scrollbar(update_frame, orient="horizontal", command=updates_text_widget.xview)
+    updates_text_widget.config(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+    # Placement des scrollbars
+    scrollbar_y.pack(side="right", fill="y")
+    scrollbar_x.pack(side="bottom", fill="x")
+
     # Bouton pour sauvegarder
-    save_button = tk.Button(update_window, text="Sauvegarder", command=save_updates, font=("Arial", 12))
+    save_button = ttk.Button(update_frame, text="Sauvegarder", command=save_updates, bootstyle="success")
     save_button.pack(pady=10)
+
+    # Bouton pour fermer la fenêtre
+    close_button = ttk.Button(update_frame, text="Fermer", command=update_window.destroy, bootstyle="danger")
+    close_button.pack(pady=5)
 
 # Fonction pour gérer l'inventaire
 def manage_inventory():
@@ -163,21 +211,37 @@ def manage_inventory():
     # Fenêtre pour gérer l'inventaire
     inventory_window = tk.Toplevel()
     inventory_window.title("Gérer l'inventaire")
+    inventory_window.geometry("600x400")  # Taille initiale
+    inventory_window.resizable(True, True)  # Permettre le redimensionnement
 
     # Centrer la fenêtre
     center_window(inventory_window)
 
-    # Zone de texte pour l'inventaire
-    tk.Label(inventory_window, text="Inventaire (format : nom, quantité) :", font=("Arial", 12)).pack(pady=5)
-    inventory_text_widget = tk.Text(inventory_window, width=50, height=15, font=("Arial", 12))
-    inventory_text_widget.pack(pady=5)
+    # Cadre principal
+    inventory_frame = ttk.Frame(inventory_window, padding=10)
+    inventory_frame.pack(fill="both", expand=True)
 
-    # Pré-remplir avec les ressources existantes
+    # Zone de texte pour l'inventaire avec scrollbar
+    inventory_text_widget = tk.Text(inventory_frame, wrap="none", width=50, height=15, font=("Arial", 12))
     inventory_text_widget.insert("1.0", "\n".join([f"{resource}, {quantity}" for resource, quantity in inventory.items()]))
 
+    # Scrollbars
+    scrollbar_y = ttk.Scrollbar(inventory_frame, orient="vertical", command=inventory_text_widget.yview)
+    scrollbar_x = ttk.Scrollbar(inventory_frame, orient="horizontal", command=inventory_text_widget.xview)
+    inventory_text_widget.config(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+    # Placement des widgets
+    inventory_text_widget.grid(row=0, column=0, sticky="nsew")
+    scrollbar_y.grid(row=0, column=1, sticky="ns")
+    scrollbar_x.grid(row=1, column=0, sticky="ew")
+
     # Bouton pour sauvegarder
-    save_button = tk.Button(inventory_window, text="Sauvegarder", command=save_inventory, font=("Arial", 12))
-    save_button.pack(pady=10)
+    save_button = ttk.Button(inventory_frame, text="Sauvegarder", command=save_inventory, bootstyle="success")
+    save_button.grid(row=2, column=0, columnspan=2, pady=10)
+
+    # Configurer la grille
+    inventory_frame.rowconfigure(0, weight=1)
+    inventory_frame.columnconfigure(0, weight=1)
 
 # Fonction principale pour l'interface graphique
 def main_gui():
@@ -198,11 +262,13 @@ def main_gui():
         show_results(recipe_name, table_text, kamas_manquant)
 
     # Fenêtre principale
-    root = tk.Tk()
+    root = ttk.Window(themename="darkly")  # Utilisation d'un thème moderne
     root.title("Dofus Touch Calculator")
-    root.resizable(False, False)  # Empêcher le redimensionnement de la fenêtre
-    root.geometry("1200x800")  # Taille fixe de la fenêtre
-    center_window(root)
+    root.resizable(True, True)  # Permettre le redimensionnement
+    root.geometry("1240x810")  # Taille initiale de la fenêtre
+    # Empecher le redimensionnement de la fenêtre
+    root.minsize(1240, 810)  # Taille minimale de la fenêtre
+    root.maxsize(1240, 810)  # Taille maximale de la fenêtre
 
     # Télécharger et charger l'image de fond
     image_url = "https://github.com/Neo-code769/DofusTouch-Calculator/blob/main/DofusTouchCalculator-background.png?raw=true"
@@ -210,38 +276,45 @@ def main_gui():
     response.raw.decode_content = True
     background_image = Image.open(response.raw)
 
-    # Redimensionner l'image à 1200x800 pixels
-    background_image = background_image.resize((1200, 800))
+    # Redimensionner l'image à 1240x810 pixels
+    background_image = background_image.resize((1240, 810))
 
     # Convertir l'image pour tkinter
     background_photo = ImageTk.PhotoImage(background_image)
+    root.background_photo = background_photo  # Conserver une référence pour éviter le garbage collector
 
     # Ajouter l'image de fond
-    background_label = tk.Label(root, image=background_photo)
+    background_label = ttk.Label(root, image=background_photo)
     background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-    # Style global
-    style = ttk.Style()
-    style.configure("TButton", font=("Arial", 12), padding=5)
-    style.configure("TLabel", font=("Arial", 14), background="#f0f0f0", borderwidth=0)
-    style.configure("TCombobox", font=("Arial", 12))
+    # Cadre principal (centré verticalement et horizontalement)
+    main_frame = ttk.Frame(root, padding=20)
+    main_frame.place(relx=0.5, rely=0.5, anchor="center")  # Centrer le cadre principal
+
+    # Section des recettes
+    recipe_frame = ttk.Labelframe(main_frame, text="Recettes", padding=10, bootstyle="primary")
+    recipe_frame.pack(pady=20, fill="x")  # Espacement vertical et remplissage horizontal
 
     # Liste déroulante pour les recettes
     recipe_names = list(recipes.keys())
-    recipe_combobox = ttk.Combobox(root, values=recipe_names, state="readonly", width=50, font=("Arial", 12))
+    recipe_combobox = ttk.Combobox(recipe_frame, values=recipe_names, state="readonly", width=50, font=("Arial", 12))
     recipe_combobox.set("Veuillez sélectionner une recette")  # Valeur par défaut
     recipe_combobox.pack(pady=10)
 
     # Bouton pour calculer
-    calculate_button = ttk.Button(root, text="Calculer", command=on_calculate)
+    calculate_button = ttk.Button(recipe_frame, text="Calculer", bootstyle=SUCCESS, command=on_calculate)
     calculate_button.pack(pady=10)
 
+    # Section pour l'inventaire
+    inventory_frame = ttk.Labelframe(main_frame, text="Inventaire", padding=10, bootstyle="info")
+    inventory_frame.pack(pady=20, fill="x")  # Espacement vertical et remplissage horizontal
+
     # Bouton pour gérer l'inventaire
-    manage_inventory_button = ttk.Button(root, text="Gérer l'inventaire", command=manage_inventory)
+    manage_inventory_button = ttk.Button(inventory_frame, text="Gérer l'inventaire", bootstyle=INFO, command=manage_inventory)
     manage_inventory_button.pack(pady=10)
 
     # Bouton pour mettre à jour les valeurs des ressources
-    update_resources_button = ttk.Button(root, text="Mettre à jour la valeur des ressources", command=update_resource_values)
+    update_resources_button = ttk.Button(inventory_frame, text="Mettre à jour la valeur des ressources", bootstyle=WARNING, command=update_resource_values)
     update_resources_button.pack(pady=10)
 
     # Lancer la boucle principale
