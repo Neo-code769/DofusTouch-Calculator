@@ -1,5 +1,5 @@
     Dofus Calculator
-    Version 2.3
+    Version 1.4
     Auteur : [Pierre Trublereau]
     Date : 2023-10-04
     Description :
@@ -11,13 +11,11 @@
         
     Historique des versions :
         Version 1.0 : Création du script de base pour le calcul des ressources
-        Version 1.1 : Ajout de la gestion de la fortune personnelle
-        Version 1.2 : Ajout de la possibilité de mettre à jour les valeurs des ressources
-        Version 2.0 : Amélioration de l'interface graphique, ajout de la gestion des erreurs et mise à jour de l'image de fond
-        Version 2.1 : Ajout de la possibilité de télécharger l'image de fond depuis une URL
-        Version 2.2 : Amélioration de la gestion des erreurs et de l'interface utilisateur
-        Version 2.3 : Ajout de la possibilité de mettre à jour la valeur en kamas des ressources directement depuis l'interface
-        NEXT : Version 3.0 : Connexion à une API pour récupérer les recettes et les ressources en temps réel
+        Version 1.1 : Ajout de la possibilité de mettre à jour les valeurs des ressources
+        Version 1.2 : Amélioration de l'interface graphique, ajout de la gestion des erreurs et mise à jour de l'image de fond
+        Version 1.3 : Amélioration de la gestion des erreurs et de l'interface utilisateur
+        Version 1.4 : Ajout de la possibilité de mettre à jour la valeur en kamas des ressources directement depuis l'interface
+        NEXT : Version 2.0 : Connexion à une API pour récupérer les recettes et les ressources en temps réel
     Features à venir :  
         - Integrer l'application dans un contenaire Docker pour faciliter le déploiement
         - Ajouter la possibilité de sauvegarder et charger l'inventaire et les recettes en cache localement
