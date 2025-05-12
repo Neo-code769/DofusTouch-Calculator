@@ -1,5 +1,5 @@
 ''' 
-    DOFUS 1.4 / Touch Upgrade
+    DOFUS 1.5 / Touch Upgrade
     Script pour calculer les ressources manquantes, ajouter des recettes, gérer l'inventaire, mettre à jour les valeurs des ressources.
 '''
 
@@ -23,6 +23,51 @@ recipes = {
         "scalp_de_klime": {"needed": 2, "value": 220000},
         "cuir_de_peunch": {"needed": 62, "value": 1500},
         "etoffe_de_cuirasse": {"needed": 31, "value": 350},
+    },
+    "Sandales de Mazin Lyn": {
+        "aile_de_nocturlabe": {"needed": 62, "value": 15500},
+        "orbe_irisé": {"needed": 63, "value": 32000},
+        "andésite": {"needed": 25, "value": 17000},
+        "tourmaline": {"needed": 10, "value": 7000},
+        "scapula_du_comte_harebourg": {"needed": 4, "value": 5500},
+        "epine_de_plantala": {"needed": 32, "value": 14000},
+        "boulon_de_cybwork": {"needed": 64, "value": 1000},
+        "fragment_gelé": {"needed": 12, "value": 20000},
+    },
+    "Talisman Igans": {
+        "orbe_irisé": {"needed": 51, "value": 32000},
+        "peau_de_rouquette": {"needed": 58, "value": 17000},
+        "tourmaline": {"needed": 12, "value": 7000},
+        "bec_de_mansordide": {"needed": 42, "value": 9000},
+        "osier_enchante": {"needed": 32, "value": 26},
+        "pipe_de_founoroshi": {"needed": 4, "value": 1500},
+        "bourgeon_explosif_de_damadrya": {"needed": 7, "value": 95000},
+        "andésite": {"needed": 25, "value": 17000},
+    },
+    "Docteur Majeur": {
+        "docteur": {"needed": 1, "value": 0},
+        "ardonite": {"needed": 2, "value": 0},
+        "essence_de_la_foret": {"needed": 2, "value": 0},
+        "galet_brasiliant": {"needed": 2, "value": 0},
+        "carpelle_de_brouture": {"needed": 10, "value": 0},
+        "jouet_de_gamine_zoth": {"needed": 10, "value": 0},
+        "katana_de_kwamourai": {"needed": 10, "value": 0},
+    },
+    "Soigneur Majeur": {
+        "soigneur": {"needed": 1, "value": 0},
+        "ardonite": {"needed": 2, "value": 0},
+        "essence_de_la_foret": {"needed": 2, "value": 0},
+        "galet_brasiliant": {"needed": 2, "value": 0},
+        "peau_de_minoskito": {"needed": 10, "value": 0},
+        "ecorce_de_floribonde": {"needed": 10, "value": 0},
+        "dent_de_kailleu": {"needed": 10, "value": 0},
+    },
+    "Bouclier du Corbac": {
+        "essence_de_maitre_corbac": {"needed": 1, "value": 0},
+        "ebonite": {"needed": 5, "value": 0},
+        "planche_en_if": {"needed": 10, "value": 0},
+        "planche_en_bambou": {"needed": 15, "value": 0},
+        "orbe_amethyste": {"needed": 20, "value": 0},
     },
 }
 
@@ -244,6 +289,45 @@ def manage_inventory():
     inventory_frame.rowconfigure(0, weight=1)
     inventory_frame.columnconfigure(0, weight=1)
 
+# Fonction pour calculer toutes les recettes
+def calculate_all_recipes():
+    all_results = ""
+    total_kamas = 0
+    for recipe_name, resources in recipes.items():
+        table_text, kamas_manquant = calculate_missing_resources(recipe_name, resources)
+        all_results += f"=== {recipe_name} ===\n{table_text}\nIl me manque : {kamas_manquant:,} kamas\n\n".replace(",", " ")
+        total_kamas += kamas_manquant
+
+    # Afficher tous les résultats dans une fenêtre
+    result_window = tk.Toplevel()
+    result_window.title("Récapitulatif de toutes les recettes")
+    result_window.geometry("900x700")
+    center_window(result_window)
+
+    result_frame = ttk.Frame(result_window, padding=10)
+    result_frame.pack(fill="both", expand=True)
+
+    text_widget = tk.Text(result_frame, wrap="none", width=120, height=30, font=("Courier", 10))
+    text_widget.insert("1.0", all_results)
+    text_widget.config(state="disabled")
+
+    scrollbar_y = ttk.Scrollbar(result_frame, orient="vertical", command=text_widget.yview)
+    scrollbar_x = ttk.Scrollbar(result_frame, orient="horizontal", command=text_widget.xview)
+    text_widget.config(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+    text_widget.grid(row=0, column=0, sticky="nsew")
+    scrollbar_y.grid(row=0, column=1, sticky="ns")
+    scrollbar_x.grid(row=1, column=0, sticky="ew")
+
+    total_label = ttk.Label(result_frame, text=f"Coût total manquant pour toutes les recettes : {total_kamas:,} kamas".replace(",", " "), font=("Arial", 12, "bold"))
+    total_label.grid(row=2, column=0, columnspan=2, pady=10)
+
+    close_button = ttk.Button(result_frame, text="Fermer", command=result_window.destroy, bootstyle="danger")
+    close_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+    result_frame.rowconfigure(0, weight=1)
+    result_frame.columnconfigure(0, weight=1)
+
 # Fonction principale pour l'interface graphique
 def main_gui():
     def on_calculate():
@@ -265,7 +349,7 @@ def main_gui():
     # Fenêtre principale
     root = ttk.Window(themename="darkly")  # Utilisation d'un thème moderne
     root.title("Dofus Touch Calculator")
-    root.geometry("1240x810")  # Taille initiale de la fenêtre
+    root.geometry("1100x800")  # Taille initiale de la fenêtre
     root.resizable(False, False)  # Désactiver le redimensionnement
 
     # Télécharger et charger l'image de fond
@@ -274,8 +358,8 @@ def main_gui():
     response.raw.decode_content = True
     background_image = Image.open(response.raw)
 
-    # Redimensionner l'image à 1240x810 pixels
-    background_image = background_image.resize((1240, 810))
+    # Redimensionner l'image à 1100x800 pixels
+    background_image = background_image.resize((1100, 800))
 
     # Convertir l'image pour tkinter
     background_photo = ImageTk.PhotoImage(background_image)
@@ -289,6 +373,38 @@ def main_gui():
     style = ttk.Style()
     style.configure("BrownFrame.TFrame", background="#8B4513", borderwidth=3, relief="solid")
 
+    # Style pour la Combobox
+    style.configure(
+        "Brown.TCombobox",
+        fieldbackground="#8B4513",  # Fond marron
+        background="#8B4513",
+        foreground="white",         # Texte blanc
+        borderwidth=0,
+        relief="flat",
+        font=("Segoe UI", 16)
+    )
+    style.map(
+        "Brown.TCombobox",
+        fieldbackground=[("readonly", "#8B4513"), ("active", "#A0522D")],
+        foreground=[("readonly", "white"), ("active", "white")]
+    )
+
+    # Style pour les boutons
+    style.configure(
+        "Brown.TButton",
+        background="#8B4513",
+        foreground="white",
+        borderwidth=0,
+        focusthickness=0,
+        font=("Segoe UI", 14),
+        relief="flat"
+    )
+    style.map(
+        "Brown.TButton",
+        background=[("active", "#A0522D"), ("pressed", "#5C3317")],
+        foreground=[("active", "white"), ("pressed", "white")]
+    )
+
     # Menu déroulant pour les recettes
     recipe_names = list(recipes.keys())
     recipe_combobox = ttk.Combobox(
@@ -296,9 +412,8 @@ def main_gui():
         values=recipe_names,
         state="readonly",
         width=75,
-        font=("Arial", 18),  # Augmenter la taille de la police
-        foreground="black",  # Texte noir
-        background="white"   # Fond blanc
+        font=("Segoe UI", 16),
+        style="Brown.TCombobox"
     )
     recipe_combobox.set("Veuillez sélectionner une recette")  # Valeur par défaut
     recipe_combobox.place(relx=0.5, rely=0.5, anchor="center")  # Positionner plus bas
@@ -308,17 +423,16 @@ def main_gui():
     recipe_combobox_frame.place(relx=0.5, rely=0.45, anchor="center")
 
     # Cadre pour les boutons avec une bordure marron
-    button_frame = ttk.Frame(root, style="BrownFrame.TFrame", padding=10)
-    button_frame.place(relx=0.5, rely=0.6, anchor="center")  # Positionner sous le menu déroulant
+    button_frame = ttk.Frame(root, style="BrownFrame.TFrame", padding=5)
+    button_frame.place(relx=0.5, rely=0.6, anchor="center", width=850)  # Positionner sous le menu déroulant
 
     # Bouton pour gérer l'inventaire
     manage_inventory_button = ttk.Button(
         button_frame,
         text="Gérer l'inventaire",
-        bootstyle=INFO,
         command=manage_inventory,
         width=20,
-        style="TButton"
+        style="Brown.TButton"
     )
     manage_inventory_button.grid(row=0, column=0, padx=10)  # Espacement horizontal
 
@@ -329,20 +443,31 @@ def main_gui():
         bootstyle=SUCCESS,
         command=on_calculate,
         width=20,
-        style="TButton"
+        style="Brown.TButton"
     )
     calculate_button.grid(row=0, column=1, padx=10)  # Espacement horizontal
 
-    # Bouton pour mettre à jour les valeurs des ressources
-    update_resources_button = ttk.Button(
+        # Bouton pour tout calculer
+    calculate_all_button = ttk.Button(
         button_frame,
-        text="Mettre à jour la valeur des ressources",
-        bootstyle=WARNING,
-        command=update_resource_values,
-        width=30,
-        style="TButton"
+        text="Calculer tout",
+        bootstyle=PRIMARY,
+        command=calculate_all_recipes,
+        width=20,
+        style="Brown.TButton"
     )
-    update_resources_button.grid(row=0, column=2, padx=10)  # Espacement horizontal
+    calculate_all_button.grid(row=0, column=3, padx=10) # Espacement horizontal
+
+    # Bouton pour calculer toutes les recettes
+    calculate_all_button = ttk.Button(
+        button_frame,
+        text="Calculer toutes les recettes",
+        bootstyle=PRIMARY,
+        command=calculate_all_recipes,
+        width=30,
+        style="Brown.TButton"
+    )
+    calculate_all_button.grid(row=0, column=3, padx=10)  # Espacement horizontal
 
     # Lancer la boucle principale
     root.mainloop()
