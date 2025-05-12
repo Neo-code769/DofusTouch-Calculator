@@ -4,12 +4,13 @@
 '''
 
 from tabulate import tabulate
-import tkinter as tk
-from tkinter import messagebox, simpledialog
+import tkinter as tk    # Pour l'interface graphique
+from tkinter import ttk  # Pour les widgets de l'interface graphique
+from tkinter import messagebox, simpledialog # Pour les boîtes de dialogue, les messages d'erreur et les entrées utilisateur
 from PIL import Image, ImageTk  # Pour gérer l'image de fond
 import requests  # Pour télécharger l'image depuis l'URL
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+import ttkbootstrap as ttk # Pour le thème moderne de l'interface graphique
+from ttkbootstrap.constants import * # Pour les styles de boutons et autres constantes
 
 # Définir les recettes et leurs ressources
 recipes = {
@@ -63,7 +64,7 @@ def calculate_missing_resources(recipe_name, resources):
 def show_results(recipe_name, table_text, kamas_manquant):
     result_window = tk.Toplevel()
     result_window.title(f"Résultats pour {recipe_name}")
-    result_window.geometry("800x600")  # Taille initiale
+    result_window.geometry("700x500")  # Taille initiale
     result_window.resizable(True, True)  # Permettre le redimensionnement
 
     # Centrer la fenêtre
@@ -264,11 +265,8 @@ def main_gui():
     # Fenêtre principale
     root = ttk.Window(themename="darkly")  # Utilisation d'un thème moderne
     root.title("Dofus Touch Calculator")
-    root.resizable(True, True)  # Permettre le redimensionnement
     root.geometry("1240x810")  # Taille initiale de la fenêtre
-    # Empecher le redimensionnement de la fenêtre
-    root.minsize(1240, 810)  # Taille minimale de la fenêtre
-    root.maxsize(1240, 810)  # Taille maximale de la fenêtre
+    root.resizable(False, False)  # Désactiver le redimensionnement
 
     # Télécharger et charger l'image de fond
     image_url = "https://github.com/Neo-code769/DofusTouch-Calculator/blob/main/DofusTouchCalculator-background.png?raw=true"
@@ -284,38 +282,67 @@ def main_gui():
     root.background_photo = background_photo  # Conserver une référence pour éviter le garbage collector
 
     # Ajouter l'image de fond
-    background_label = ttk.Label(root, image=background_photo)
+    background_label = ttk.Label(root, image=background_photo, borderwidth=0)
     background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-    # Cadre principal (centré verticalement et horizontalement)
-    main_frame = ttk.Frame(root, padding=20)
-    main_frame.place(relx=0.5, rely=0.5, anchor="center")  # Centrer le cadre principal
+    # Définir un style pour le cadre avec une bordure marron foncé
+    style = ttk.Style()
+    style.configure("BrownFrame.TFrame", background="#8B4513", borderwidth=3, relief="solid")
 
-    # Section des recettes
-    recipe_frame = ttk.Labelframe(main_frame, text="Recettes", padding=10, bootstyle="primary")
-    recipe_frame.pack(pady=20, fill="x")  # Espacement vertical et remplissage horizontal
-
-    # Liste déroulante pour les recettes
+    # Menu déroulant pour les recettes
     recipe_names = list(recipes.keys())
-    recipe_combobox = ttk.Combobox(recipe_frame, values=recipe_names, state="readonly", width=50, font=("Arial", 12))
+    recipe_combobox = ttk.Combobox(
+        root,
+        values=recipe_names,
+        state="readonly",
+        width=75,
+        font=("Arial", 18),  # Augmenter la taille de la police
+        foreground="black",  # Texte noir
+        background="white"   # Fond blanc
+    )
     recipe_combobox.set("Veuillez sélectionner une recette")  # Valeur par défaut
-    recipe_combobox.pack(pady=10)
+    recipe_combobox.place(relx=0.5, rely=0.5, anchor="center")  # Positionner plus bas
 
-    # Bouton pour calculer
-    calculate_button = ttk.Button(recipe_frame, text="Calculer", bootstyle=SUCCESS, command=on_calculate)
-    calculate_button.pack(pady=10)
+    # Ajouter une bordure marron foncé autour du menu déroulant
+    recipe_combobox_frame = ttk.Frame(root, style="BrownFrame.TFrame", padding=5)
+    recipe_combobox_frame.place(relx=0.5, rely=0.45, anchor="center")
 
-    # Section pour l'inventaire
-    inventory_frame = ttk.Labelframe(main_frame, text="Inventaire", padding=10, bootstyle="info")
-    inventory_frame.pack(pady=20, fill="x")  # Espacement vertical et remplissage horizontal
+    # Cadre pour les boutons avec une bordure marron
+    button_frame = ttk.Frame(root, style="BrownFrame.TFrame", padding=10)
+    button_frame.place(relx=0.5, rely=0.6, anchor="center")  # Positionner sous le menu déroulant
 
     # Bouton pour gérer l'inventaire
-    manage_inventory_button = ttk.Button(inventory_frame, text="Gérer l'inventaire", bootstyle=INFO, command=manage_inventory)
-    manage_inventory_button.pack(pady=10)
+    manage_inventory_button = ttk.Button(
+        button_frame,
+        text="Gérer l'inventaire",
+        bootstyle=INFO,
+        command=manage_inventory,
+        width=20,
+        style="TButton"
+    )
+    manage_inventory_button.grid(row=0, column=0, padx=10)  # Espacement horizontal
+
+    # Bouton pour calculer
+    calculate_button = ttk.Button(
+        button_frame,
+        text="Calculer",
+        bootstyle=SUCCESS,
+        command=on_calculate,
+        width=20,
+        style="TButton"
+    )
+    calculate_button.grid(row=0, column=1, padx=10)  # Espacement horizontal
 
     # Bouton pour mettre à jour les valeurs des ressources
-    update_resources_button = ttk.Button(inventory_frame, text="Mettre à jour la valeur des ressources", bootstyle=WARNING, command=update_resource_values)
-    update_resources_button.pack(pady=10)
+    update_resources_button = ttk.Button(
+        button_frame,
+        text="Mettre à jour la valeur des ressources",
+        bootstyle=WARNING,
+        command=update_resource_values,
+        width=30,
+        style="TButton"
+    )
+    update_resources_button.grid(row=0, column=2, padx=10)  # Espacement horizontal
 
     # Lancer la boucle principale
     root.mainloop()
