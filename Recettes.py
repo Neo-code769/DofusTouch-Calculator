@@ -1,0 +1,58 @@
+# Définir les recettes et leurs ressources
+recipes = {
+    "Cape Cérémonial de Mazin Lyn": {
+        "orbe_irisé": {"needed": 63, "value": 32000},
+        "andésite": {"needed": 25, "value": 17000},
+        "galets_brasiliant": {"needed": 3, "value": 190000},
+        "cuir_de_godruche": {"needed": 64, "value": 12000},
+        "moustache_de_klime": {"needed": 10, "value": 2500},
+        "scalp_de_klime": {"needed": 2, "value": 220000},
+        "cuir_de_peunch": {"needed": 62, "value": 1500},
+        "etoffe_de_cuirasse": {"needed": 31, "value": 350},
+    },
+    "Sandales de Mazin Lyn": {
+        "aile_de_nocturlabe": {"needed": 62, "value": 15500},
+        "orbe_irisé": {"needed": 63, "value": 32000},
+        "andésite": {"needed": 25, "value": 17000},
+        "tourmaline": {"needed": 10, "value": 7000},
+        "scapula_du_comte_harebourg": {"needed": 4, "value": 5500},
+        "epine_de_plantala": {"needed": 32, "value": 14000},
+        "boulon_de_cybwork": {"needed": 64, "value": 1000},
+        "fragment_gelé": {"needed": 12, "value": 20000},
+    },
+    "Ceintrigue": {
+        "orbe_irisé": {"needed": 51, "value": 32000},
+        "peau_de_rouquette": {"needed": 58, "value": 17000},
+        "tourmaline": {"needed": 12, "value": 7000},
+        "bec_de_mansordide": {"needed": 42, "value": 9000},
+        "osier_enchante": {"needed": 32, "value": 26},
+        "pipe_de_founoroshi": {"needed": 4, "value": 1500},
+        "bourgeon_explosif_de_damadrya": {"needed": 7, "value": 95000},
+        "andésite": {"needed": 25, "value": 17000},
+    },
+    "Docteur Majeur": {
+        "docteur": {"needed": 1, "value": 0},
+        "ardonite": {"needed": 2, "value": 0},
+        "essence_de_la_foret": {"needed": 2, "value": 0},
+        "galet_brasiliant": {"needed": 2, "value": 0},
+        "carpelle_de_brouture": {"needed": 10, "value": 0},
+        "jouet_de_gamine_zoth": {"needed": 10, "value": 0},
+        "katana_de_kwamourai": {"needed": 10, "value": 0},
+    },
+    "Soigneur Majeur": {
+        "soigneur": {"needed": 1, "value": 0},
+        "ardonite": {"needed": 2, "value": 0},
+        "essence_de_la_foret": {"needed": 2, "value": 0},
+        "galet_brasiliant": {"needed": 2, "value": 0},
+        "peau_de_minoskito": {"needed": 10, "value": 0},
+        "ecorce_de_floribonde": {"needed": 10, "value": 0},
+        "dent_de_kailleu": {"needed": 10, "value": 0},
+    },
+    "Bouclier du Corbac": {
+        "essence_de_maitre_corbac": {"needed": 1, "value": 0},
+        "ebonite": {"needed": 5, "value": 0},
+        "planche_en_if": {"needed": 10, "value": 0},
+        "planche_en_bambou": {"needed": 15, "value": 0},
+        "orbe_amethyste": {"needed": 20, "value": 0},
+    }
+}
