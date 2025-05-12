@@ -20,7 +20,7 @@ recipes = {
         "boulon_de_cybwork": {"needed": 64, "value": 1000},
         "fragment_gelé": {"needed": 12, "value": 20000},
     },
-    "Ceintrigue": {
+    "Talisman Igans": {
         "orbe_irisé": {"needed": 51, "value": 32000},
         "peau_de_rouquette": {"needed": 58, "value": 17000},
         "tourmaline": {"needed": 12, "value": 7000},
