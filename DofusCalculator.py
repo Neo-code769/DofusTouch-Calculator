@@ -8,32 +8,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image, ImageTk  # Pour gérer l'image de fond
 import requests  # Pour télécharger l'image depuis l'URL
-
-# Définir les recettes et leurs ressources
-recipes = {
-    "Cape Cérémonial de Mazin Lyn": {
-        "orbe_irisé": {"needed": 63, "value": 35000},
-        "andésite": {"needed": 25, "value": 20000},
-        "galets_brasiliant": {"needed": 3, "value": 190000},
-        "cuir_de_godruche": {"needed": 64, "value": 12000},
-        "moustache_de_klime": {"needed": 10, "value": 2500},
-        "scalp_de_klime": {"needed": 2, "value": 220000},
-        "cuir_de_peunch": {"needed": 62, "value": 1500},
-        "etoffe_de_cuirasse": {"needed": 31, "value": 350},
-    },
-}
-
-# Inventaire global
-inventory = {
-    "orbe_irisé": 51,
-    "andésite": 10,
-    "galets_brasiliant": 3,
-    "cuir_de_godruche": 0,
-    "moustache_de_klime": 0,
-    "scalp_de_klime": 0,
-    "cuir_de_peunch": 0,
-    "etoffe_de_cuirasse": 0,
-}
+from Recettes import recipes
+from Inventory import inventory
 
 # Fonction pour calculer les ressources manquantes et leur coût
 def calculate_missing_resources(recipe_name, resources):
