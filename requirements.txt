@@ -1,0 +1,5 @@
+tabulate
+Pillow
+requests
+ttkbootstrap
+pytest
