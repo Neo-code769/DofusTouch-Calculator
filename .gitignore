@@ -1,4 +1,23 @@
+# Données utilisateur (inventaire et recettes sauvegardés localement)
+data/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
