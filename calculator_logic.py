@@ -8,6 +8,9 @@ import os
 from tabulate import tabulate
 
 DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "save.json")
+DOFUS_TOUCH_RECIPES_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "dofus_touch_recipes.json"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -222,3 +225,29 @@ def save_data(inventory, recipes, custom_recipe_names, filepath=None):
     }
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def load_dofus_touch_recipes(filepath=None):
+    """Charge les recettes importées depuis l'encyclopédie Dofus Touch (crawlit).
+
+    Le fichier est généré par scripts/import_dofus_touch_data.py.
+
+    Args:
+        filepath: chemin optionnel (utilise DOFUS_TOUCH_RECIPES_FILE par défaut)
+
+    Returns:
+        dict {nom_recette: {nom_ressource: {"needed": int, "value": int}}}
+        Retourne un dict vide si le fichier n'existe pas ou est corrompu.
+    """
+    filepath = filepath or DOFUS_TOUCH_RECIPES_FILE
+    if not os.path.exists(filepath):
+        return {}
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Validation minimale : doit être un dict de dicts
+        if not isinstance(data, dict):
+            return {}
+        return data
+    except (json.JSONDecodeError, IOError):
+        return {}

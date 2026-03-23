@@ -14,6 +14,7 @@ from calculator_logic import (
     parse_new_recipe,
     load_saved_data,
     save_data,
+    load_dofus_touch_recipes,
 )
 
 
@@ -384,3 +385,155 @@ class TestPersistence:
         save_data(inv, {}, set(), filepath=filepath)
         saved = load_saved_data(filepath=filepath)
         assert saved["inventory"]["orbe_irisé"] == 99
+
+
+# ---------------------------------------------------------------------------
+# load_dofus_touch_recipes
+# ---------------------------------------------------------------------------
+
+class TestLoadDofusTouchRecipes:
+
+    def test_returns_empty_when_file_missing(self, tmp_path):
+        filepath = str(tmp_path / "nonexistent.json")
+        result = load_dofus_touch_recipes(filepath=filepath)
+        assert result == {}
+
+    def test_returns_empty_on_corrupted_file(self, tmp_path):
+        filepath = str(tmp_path / "recipes.json")
+        with open(filepath, "w") as f:
+            f.write("not valid json {{{")
+        result = load_dofus_touch_recipes(filepath=filepath)
+        assert result == {}
+
+    def test_returns_empty_on_non_dict_content(self, tmp_path):
+        filepath = str(tmp_path / "recipes.json")
+        with open(filepath, "w", encoding="utf-8") as f:
+            import json
+            json.dump([1, 2, 3], f)
+        result = load_dofus_touch_recipes(filepath=filepath)
+        assert result == {}
+
+    def test_loads_valid_recipes(self, tmp_path):
+        filepath = str(tmp_path / "recipes.json")
+        data = {
+            "Épée du Granduk": {
+                "Ventouse du Kralamoure géant": {"needed": 8, "value": 0},
+                "Bave de Boufton Blanc": {"needed": 4, "value": 0},
+            },
+            "Potion de soin": {
+                "Eau": {"needed": 1, "value": 0},
+            },
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            import json
+            json.dump(data, f, ensure_ascii=False)
+        result = load_dofus_touch_recipes(filepath=filepath)
+        assert len(result) == 2
+        assert result["Épée du Granduk"]["Ventouse du Kralamoure géant"]["needed"] == 8
+        assert result["Potion de soin"]["Eau"]["value"] == 0
+
+    def test_value_defaults_to_zero_in_loaded_recipes(self, tmp_path):
+        filepath = str(tmp_path / "recipes.json")
+        data = {"Recette Test": {"res_a": {"needed": 5, "value": 0}}}
+        with open(filepath, "w", encoding="utf-8") as f:
+            import json
+            json.dump(data, f)
+        result = load_dofus_touch_recipes(filepath=filepath)
+        assert result["Recette Test"]["res_a"]["value"] == 0
+
+
+# ---------------------------------------------------------------------------
+# scripts/import_dofus_touch_data — conversion locale (sans réseau)
+# ---------------------------------------------------------------------------
+
+class TestImportConversion:
+    """Tests unitaires de la logique de conversion crawlit → format projet."""
+
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+        from scripts.import_dofus_touch_data import _convert_item
+        self._convert = _convert_item
+
+    def test_item_with_recipe(self):
+        item = {
+            "name": "Épée Test",
+            "recipe": [
+                {"Ventouse du Kralamoure géant": {"quantity": "8", "type": "Ressources"}},
+                {"Bave de Boufton": {"quantity": "4", "type": "Ressources"}},
+            ],
+        }
+        result = self._convert(item)
+        assert result == {
+            "Ventouse du Kralamoure géant": {"needed": 8, "value": 0},
+            "Bave de Boufton": {"needed": 4, "value": 0},
+        }
+
+    def test_item_without_recipe_returns_none(self):
+        item = {"name": "Objet sans recette", "recipe": []}
+        assert self._convert(item) is None
+
+    def test_item_missing_recipe_key_returns_none(self):
+        item = {"name": "Objet sans clé recipe"}
+        assert self._convert(item) is None
+
+    def test_invalid_quantity_skipped(self):
+        item = {
+            "name": "Épée Test",
+            "recipe": [
+                {"Res valide": {"quantity": "5", "type": "X"}},
+                {"Res invalide": {"quantity": "pas_un_nombre", "type": "X"}},
+            ],
+        }
+        result = self._convert(item)
+        assert result is not None
+        assert "Res valide" in result
+        assert "Res invalide" not in result
+
+    def test_all_invalid_quantities_returns_none(self):
+        item = {
+            "name": "Épée Test",
+            "recipe": [{"Res": {"quantity": "invalide"}}],
+        }
+        assert self._convert(item) is None
+
+    def test_value_always_zero(self):
+        item = {
+            "name": "Épée Test",
+            "recipe": [{"Res": {"quantity": "10"}}],
+        }
+        result = self._convert(item)
+        assert result["Res"]["value"] == 0
+
+    def test_run_saves_to_file(self, tmp_path):
+        """Test de run() avec un mock réseau — vérifie uniquement l'écriture du fichier."""
+        from unittest.mock import patch, MagicMock
+        import json as json_mod
+        from scripts.import_dofus_touch_data import run
+
+        fake_items = [
+            {
+                "name": "Chapeau Test",
+                "recipe": [{"Res A": {"quantity": "3"}}],
+            },
+            {
+                "name": "Chapeau sans recette",
+                "recipe": [],
+            },
+        ]
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = fake_items
+        mock_response.raise_for_status.return_value = None
+
+        output = str(tmp_path / "out.json")
+        with patch("scripts.import_dofus_touch_data.OUTPUT_FILE", output):
+            with patch("scripts.import_dofus_touch_data.requests.get", return_value=mock_response):
+                result = run()
+
+        assert "Chapeau Test" in result
+        assert "Chapeau sans recette" not in result
+        assert os.path.exists(output)
+        with open(output, encoding="utf-8") as f:
+            saved = json_mod.load(f)
+        assert "Chapeau Test" in saved
