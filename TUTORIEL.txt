@@ -1,0 +1,499 @@
+============================================================
+   DOFUS TOUCH CALCULATOR — TUTORIEL D'UTILISATION
+   Version 3.0
+============================================================
+
+Ce tutoriel explique comment utiliser toutes les fonctionnalités
+de l'outil, que ce soit via l'interface graphique (bureau) ou
+via l'interface web (navigateur).
+
+
+------------------------------------------------------------
+SOMMAIRE
+------------------------------------------------------------
+
+  1. Installation et lancement
+  2. Interface graphique — présentation
+  3. Calculer une recette
+  4. Gérer son inventaire
+  5. Mettre à jour les valeurs en kamas
+  6. Rentabilité HDV
+  7. Liste de courses multi-recettes
+  8. Mise à jour automatique des prix (DofusDB)
+  9. Importer les recettes Dofus Touch
+ 10. Ajouter une recette personnalisée
+ 11. Calculer toutes les recettes d'un coup
+ 12. Historique et statistiques de progression
+ 13. Interface web (Flask)
+ 14. Docker
+ 15. Conseils pratiques
+
+
+------------------------------------------------------------
+1. INSTALLATION ET LANCEMENT
+------------------------------------------------------------
+
+Prérequis : Python 3.10 ou supérieur installé sur votre machine.
+
+Étape 1 — Installer les dépendances :
+
+    pip install -r requirements.txt
+
+Étape 2 — Lancer l'interface graphique :
+
+    python DofusCalculator.py
+
+Étape 3 (optionnel) — Lancer l'interface web :
+
+    python web_app.py
+    Puis ouvrir http://localhost:5000 dans un navigateur.
+
+
+------------------------------------------------------------
+2. INTERFACE GRAPHIQUE — PRÉSENTATION
+------------------------------------------------------------
+
+La fenêtre principale contient :
+
+  - Un menu déroulant pour sélectionner une recette
+  - Ligne 1 de boutons (5 actions principales) :
+      [ Gérer l'inventaire ]
+      [ Calculer ]
+      [ Ajouter une recette ]
+      [ Mettre à jour les valeurs ]
+      [ Calculer toutes les recettes ]
+  - Ligne 2 de boutons (nouvelles fonctionnalités) :
+      [ Liste de courses ]
+      [ Mise à jour prix DofusDB ]
+      [ Statistiques / Historique ]
+  - Ligne 3 :
+      [ Importer / Mettre à jour les recettes Dofus Touch ]
+
+Au bas de la fenêtre s'affiche le nombre de recettes Dofus Touch
+chargées depuis l'encyclopédie (si un import a déjà été effectué).
+
+
+------------------------------------------------------------
+3. CALCULER UNE RECETTE
+------------------------------------------------------------
+
+But : savoir combien de ressources il vous manque et combien
+cela va vous coûter en kamas.
+
+  1. Dans le menu déroulant, sélectionnez une recette.
+     Exemple : "Cape Cérémonial de Mazin Lyn"
+
+  2. Cliquez sur [ Calculer ].
+
+  3. Une fenêtre s'ouvre avec :
+     - Un tableau listant chaque ressource :
+         Ressource | Requis | Acquis | Manquant | Valeur unitaire
+     - Une barre de progression :
+         "Complétion : ████████░░ 80%  (8 / 10 ressources complètes)"
+     - Le coût total des ressources manquantes en kamas.
+     - Un champ pour saisir le prix de vente HDV (voir section 6).
+
+Remarque : "Acquis" correspond à la quantité saisie dans votre
+inventaire. Si vous n'avez pas encore renseigné votre inventaire,
+toutes les valeurs "Acquis" seront à 0.
+
+
+------------------------------------------------------------
+4. GÉRER SON INVENTAIRE
+------------------------------------------------------------
+
+But : indiquer à l'outil combien de ressources vous possédez
+réellement dans le jeu.
+
+  1. Cliquez sur [ Gérer l'inventaire ].
+
+  2. Une zone de texte s'ouvre avec toutes les ressources
+     connues, au format :
+         nom_ressource, quantité
+
+     Exemple :
+         orbe_irisé, 51
+         andésite, 10
+         galets_brasiliant, 3
+         cuir_de_godruche, 0
+
+  3. Modifiez les quantités selon votre inventaire en jeu.
+
+  4. Cliquez sur [ Sauvegarder ].
+
+La sauvegarde est automatique dans data/save.json.
+Un snapshot de progression est enregistré pour chaque recette
+(utilisé par l'historique, voir section 12).
+
+Conseil : mettez à jour votre inventaire régulièrement, surtout
+après une session de farm, pour avoir des calculs précis.
+
+
+------------------------------------------------------------
+5. METTRE À JOUR LES VALEURS EN KAMAS
+------------------------------------------------------------
+
+But : renseigner le prix d'achat de chaque ressource à l'HdV,
+afin que l'outil calcule un coût réaliste.
+
+  1. Cliquez sur [ Mettre à jour les valeurs ].
+
+  2. Une zone de texte liste toutes les ressources connues
+     avec leur valeur actuelle :
+         nom_ressource, valeur_kamas
+
+     Exemple :
+         orbe_irisé, 32000
+         andésite, 17000
+         cuir_de_godruche, 12000
+
+  3. Modifiez les prix selon les cours actuels de votre serveur.
+
+  4. Cliquez sur [ Sauvegarder ].
+
+Les valeurs sont persistées dans data/save.json et utilisées
+dans tous les calculs de coût.
+
+Conseil : une ressource avec la valeur 0 n'est pas comptée dans
+le coût total. Utilisez 0 pour les ressources que vous farmez
+vous-même gratuitement.
+
+
+------------------------------------------------------------
+6. RENTABILITÉ HDV
+------------------------------------------------------------
+
+But : savoir si crafter un objet est rentable par rapport à
+son prix de vente à l'Hôtel des Ventes.
+
+  1. Calculez une recette (section 3).
+
+  2. Dans la fenêtre de résultats, repérez la section
+     "Rentabilité HDV".
+
+  3. Saisissez le prix de vente de l'objet crafté à l'HdV.
+     Exemple : 999000
+
+  4. L'outil affiche immédiatement :
+     - Bénéfice : +69 000 kamas
+     - Marge : +6.9%
+     En vert si rentable, en rouge si déficitaire.
+
+  5. Le prix de vente est sauvegardé automatiquement dans
+     data/sell_prices.json pour la prochaine utilisation.
+
+Exemple de lecture :
+  Coût de craft  :  930 000 kamas
+  Prix de vente  :  999 000 kamas
+  Bénéfice       :  +69 000 kamas  (+7.4%)   ← rentable (vert)
+
+  Coût de craft  : 1 200 000 kamas
+  Prix de vente  :   999 000 kamas
+  Bénéfice       :  -201 000 kamas  (-16.8%)  ← déficitaire (rouge)
+
+
+------------------------------------------------------------
+7. LISTE DE COURSES MULTI-RECETTES
+------------------------------------------------------------
+
+But : préparer une seule liste d'achats pour crafter plusieurs
+objets en même temps, en agrégeant les ressources communes.
+
+  1. Cliquez sur [ Liste de courses ].
+
+  2. Dans la liste qui s'affiche, sélectionnez plusieurs recettes
+     en maintenant Ctrl enfoncé et en cliquant sur chacune.
+     Exemple : "Cape Cérémonial de Mazin Lyn" + "Sandales de Mazin Lyn"
+
+  3. Cliquez sur [ Calculer la liste de courses ].
+
+  4. Un tableau s'affiche avec l'agrégation :
+     - Les ressources communes sont fusionnées (quantités additionnées)
+     - Colonne "Requis" = somme des besoins des deux recettes
+     - Colonne "Manquant" = ce qu'il reste réellement à acheter
+     - Le tableau est trié par ressource la plus manquante en premier
+     - Le coût total estimé est affiché en bas
+
+Exemple :
+  "orbe_irisé" est requis dans les deux recettes :
+    Cape     → 63 orbes
+    Sandales → 63 orbes
+    Total    → 126 orbes requis
+    Si vous en avez 51 → 75 à acheter
+
+Conseil : idéal pour optimiser vos achats à l'HdV en une seule
+session, sans avoir à consulter chaque recette séparément.
+
+
+------------------------------------------------------------
+8. MISE À JOUR AUTOMATIQUE DES PRIX (DOFUSDB)
+------------------------------------------------------------
+
+But : récupérer automatiquement les prix HdV actuels depuis
+la base de données DofusDB, sans les saisir à la main.
+
+  1. Connectez-vous à Internet.
+
+  2. Cliquez sur [ Mise à jour prix DofusDB ].
+
+  3. Une fenêtre de log s'ouvre. L'outil interroge l'API
+     DofusDB pour chaque ressource dont l'identifiant est connu.
+
+  4. Une fois terminé, le message suivant apparaît :
+     "✓ X ressources mises à jour avec les prix DofusDB."
+
+  5. Cliquez sur [ Fermer ]. Les valeurs sont automatiquement
+     sauvegardées dans data/save.json.
+
+Important :
+  - Cette fonctionnalité ne fonctionne qu'avec les ressources
+    importées via l'encyclopédie crawlit (section 9), car elles
+    seules possèdent un identifiant DofusDB.
+  - Les 6 recettes hardcodées de base (Cape, Sandales, etc.)
+    ne sont pas couvertes — mettez leurs prix à jour manuellement.
+  - Si l'API DofusDB est indisponible, aucun prix n'est modifié
+    et l'outil affiche un message d'avertissement.
+
+
+------------------------------------------------------------
+9. IMPORTER LES RECETTES DOFUS TOUCH
+------------------------------------------------------------
+
+But : charger en masse les recettes officielles de Dofus Touch
+depuis l'encyclopédie communautaire crawlit (dofapi).
+
+  1. Connectez-vous à Internet.
+
+  2. Cliquez sur [ Importer / Mettre à jour les recettes Dofus Touch ].
+
+  3. Une fenêtre de log s'ouvre. L'import se déroule en arrière-plan :
+     - Téléchargement de allequipments.json
+     - Téléchargement de allweapons.json
+     - Téléchargement de consumable.json
+
+  4. À la fin, le log affiche :
+     "Total : XXXX recettes → data/dofus_touch_recipes.json"
+     "✓ XXXX recettes Dofus Touch chargées."
+
+  5. Le menu déroulant est automatiquement mis à jour avec
+     toutes les nouvelles recettes.
+
+  6. Cliquez sur [ Fermer ].
+
+Remarques importantes :
+  - Vos valeurs kamas personnalisées sont préservées après
+    chaque import (elles ne sont pas écrasées).
+  - Les recettes hardcodées (Cape, Sandales, etc.) et vos
+    recettes personnalisées ne sont jamais remplacées.
+  - L'import peut être relancé autant de fois que souhaité
+    pour récupérer les mises à jour de l'encyclopédie.
+  - Les données sont issues de Dofus Touch uniquement
+    (pas de données Dofus 3 PC).
+
+
+------------------------------------------------------------
+10. AJOUTER UNE RECETTE PERSONNALISÉE
+------------------------------------------------------------
+
+But : ajouter une recette qui n'existe pas dans les données
+importées ou qui est spécifique à votre usage.
+
+  1. Cliquez sur [ Ajouter une recette ].
+
+  2. Renseignez le nom de la recette.
+     Exemple : Mon Stuff Optimisé
+
+  3. Dans la zone de texte, saisissez les ressources,
+     une par ligne, au format :
+         nom_ressource, quantité, valeur_kamas
+
+     Exemple :
+         orbe_irisé, 10, 32000
+         andésite, 5, 17000
+         cuir_de_godruche, 20, 12000
+
+  4. Cliquez sur [ Ajouter la recette ].
+
+La recette apparaît immédiatement dans le menu déroulant
+et est sauvegardée dans data/save.json.
+
+Règles de format :
+  - Exactement 3 colonnes par ligne séparées par des virgules
+  - La quantité doit être un entier strictement positif (>= 1)
+  - La valeur peut être 0 (ressource farmée gratuitement)
+  - Les lignes vides sont ignorées
+
+
+------------------------------------------------------------
+11. CALCULER TOUTES LES RECETTES D'UN COUP
+------------------------------------------------------------
+
+But : avoir une vue d'ensemble de l'avancement sur toutes
+vos recettes et le coût global.
+
+  1. Cliquez sur [ Calculer toutes les recettes ].
+
+  2. Une fenêtre s'ouvre avec, pour chaque recette :
+     - Le nom de la recette
+     - La barre de progression et le pourcentage
+     - Le tableau détaillé des ressources
+     - Le coût des ressources manquantes
+
+  3. En bas : le coût total manquant pour TOUTES les recettes.
+
+Conseil : utilisez le défilement vertical pour parcourir
+l'ensemble des résultats.
+
+
+------------------------------------------------------------
+12. HISTORIQUE ET STATISTIQUES DE PROGRESSION
+------------------------------------------------------------
+
+But : visualiser votre progression au fil du temps sur
+chaque recette.
+
+Comment les données sont collectées :
+  À chaque fois que vous sauvegardez votre inventaire
+  (section 4), un snapshot est enregistré automatiquement
+  pour chaque recette. Il contient :
+  - La date et l'heure
+  - Le nombre de ressources complètes
+  - Le pourcentage de complétion
+  - Le coût restant en kamas
+
+Consulter les graphiques :
+  1. Sauvegardez votre inventaire au moins une fois
+     (les graphiques nécessitent des données historiques).
+
+  2. Cliquez sur [ Statistiques / Historique ].
+
+  3. Sélectionnez une recette dans le menu déroulant.
+
+  4. Deux graphiques s'affichent côte à côte :
+     - Graphique gauche : évolution du taux de complétion (%)
+     - Graphique droite : évolution des kamas manquants
+
+  5. Changez de recette dans le menu pour voir d'autres courbes.
+
+Stockage :
+  L'historique est enregistré dans data/history.json.
+  Maximum 100 snapshots conservés par recette (les plus anciens
+  sont supprimés automatiquement au-delà de cette limite).
+
+
+------------------------------------------------------------
+13. INTERFACE WEB (FLASK)
+------------------------------------------------------------
+
+But : utiliser le calculateur depuis un navigateur web, sans
+avoir besoin de tkinter ni d'un environnement graphique.
+
+Lancement :
+    python web_app.py
+
+Puis ouvrir : http://localhost:5000
+
+Fonctionnalités disponibles dans l'interface web :
+
+  A) Calculer une recette
+     - Sélectionnez une recette dans la liste déroulante
+     - Saisissez optionnellement un prix de vente HDV
+     - Cliquez sur [ Calculer ]
+     - Le tableau des ressources, la barre de progression
+       et la rentabilité s'affichent instantanément
+
+  B) Liste de courses multi-recettes
+     - Sélectionnez plusieurs recettes (Ctrl+clic)
+     - Cliquez sur [ Calculer la liste ]
+     - Le tableau agrégé et le coût total s'affichent
+
+API REST disponible :
+
+  GET  /api/recipes
+       → Retourne la liste de toutes les recettes en JSON
+
+  POST /api/calculate
+       Corps : {"recipe_name": "Cape Cérémonial de Mazin Lyn"}
+       → Retourne le tableau, kamas, complétion, rentabilité
+
+  POST /api/sell-price
+       Corps : {"recipe_name": "Cape...", "sell_price": 999000}
+       → Enregistre le prix de vente HDV
+
+  POST /api/shopping-list
+       Corps : {"recipe_names": ["Cape...", "Sandales..."]}
+       → Retourne la liste de courses agrégée
+
+Exemple d'appel API avec curl :
+
+  curl -X POST http://localhost:5000/api/calculate \
+       -H "Content-Type: application/json" \
+       -d '{"recipe_name": "Cape Cérémonial de Mazin Lyn"}'
+
+
+------------------------------------------------------------
+14. DOCKER
+------------------------------------------------------------
+
+But : lancer l'application dans un conteneur, notamment
+sur un serveur sans environnement graphique natif.
+
+Construction de l'image :
+    docker build -t dofus-touch-calculator .
+
+Lancement sur Linux (avec interface graphique) :
+    docker run -e DISPLAY=$DISPLAY \
+               -v /tmp/.X11-unix:/tmp/.X11-unix \
+               -v $(pwd)/data:/app/data \
+               dofus-touch-calculator
+
+Le volume -v $(pwd)/data:/app/data permet de conserver
+vos données (inventaire, recettes, historique) entre
+les redémarrages du conteneur.
+
+
+------------------------------------------------------------
+15. CONSEILS PRATIQUES
+------------------------------------------------------------
+
+Flux de travail recommandé :
+
+  Première utilisation :
+    1. Importez les recettes Dofus Touch (section 9)
+    2. Mettez à jour les prix via DofusDB (section 8)
+       OU saisissez les prix manuellement (section 5)
+    3. Renseignez votre inventaire (section 4)
+    4. Calculez votre recette (section 3)
+
+  Utilisation régulière :
+    1. Mettez à jour votre inventaire après chaque farm
+    2. Rafraîchissez les prix DofusDB si les cours ont changé
+    3. Consultez l'historique pour suivre votre progression
+
+Où sont stockées mes données ?
+    data/save.json          → inventaire + prix + recettes custom
+    data/sell_prices.json   → prix de vente HdV
+    data/history.json       → historique de progression
+    data/dofus_touch_recipes.json → recettes importées
+
+Ces fichiers sont ignorés par git (données personnelles).
+Faites-en une copie de sauvegarde si vous le souhaitez.
+
+Format des noms de ressources :
+  Les ressources utilisent des underscores à la place des
+  espaces en interne (ex: "orbe_irisé"), mais l'affichage
+  dans les tableaux les remplace par des espaces normaux.
+  Utilisez le format avec underscores pour la saisie manuelle.
+
+Ressources avec valeur 0 :
+  Si vous farmez vous-même une ressource et que vous ne
+  voulez pas qu'elle compte dans le coût, laissez sa valeur
+  à 0. Elle sera comptabilisée dans le tableau (colonnes
+  Requis / Acquis / Manquant) mais n'ajoutera rien au total
+  en kamas.
+
+
+------------------------------------------------------------
+FIN DU TUTORIEL
+------------------------------------------------------------
+Dofus Touch Calculator v3.0 — github.com/Neo-code769/DofusTouch-Calculator
