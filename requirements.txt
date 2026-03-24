@@ -3,3 +3,5 @@ Pillow
 requests
 ttkbootstrap
 pytest
+flask
+matplotlib

@@ -52,6 +52,7 @@ def _convert_item(item):
                 resources[resource_name] = {
                     "needed": int(data["quantity"]),
                     "value": 0,
+                    "id": str(data.get("id", "")),
                 }
             except (KeyError, ValueError, TypeError):
                 continue

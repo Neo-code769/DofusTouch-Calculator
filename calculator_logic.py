@@ -251,3 +251,198 @@ def load_dofus_touch_recipes(filepath=None):
         return data
     except (json.JSONDecodeError, IOError):
         return {}
+
+
+# ---------------------------------------------------------------------------
+# Axe 1 — Rentabilité HDV
+# ---------------------------------------------------------------------------
+
+SELL_PRICES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "sell_prices.json")
+
+
+def load_sell_prices(filepath=None):
+    """Charge les prix de vente HDV sauvegardés.
+
+    Returns:
+        dict {nom_recette: int}
+    """
+    filepath = filepath or SELL_PRICES_FILE
+    if not os.path.exists(filepath):
+        return {}
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def save_sell_prices(sell_prices, filepath=None):
+    """Sauvegarde les prix de vente HDV dans un fichier JSON."""
+    filepath = filepath or SELL_PRICES_FILE
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(sell_prices, f, ensure_ascii=False, indent=2)
+
+
+def calculate_profitability(craft_cost, sell_price):
+    """Calcule la rentabilité d'un craft.
+
+    Args:
+        craft_cost: coût total du craft en kamas
+        sell_price: prix de vente HDV en kamas
+
+    Returns:
+        dict avec les clés:
+            profit: int (peut être négatif)
+            margin_pct: float (peut être négatif)
+            is_profitable: bool
+    """
+    profit = sell_price - craft_cost
+    margin_pct = (profit / craft_cost * 100) if craft_cost > 0 else 0.0
+    return {
+        "profit": profit,
+        "margin_pct": round(margin_pct, 1),
+        "is_profitable": profit > 0,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Axe 2 — Agrégateur de courses multi-recettes
+# ---------------------------------------------------------------------------
+
+def aggregate_shopping_list(selected_recipe_names, recipes, inventory):
+    """Agrège les ressources manquantes pour plusieurs recettes simultanément.
+
+    Args:
+        selected_recipe_names: list de noms de recettes à considérer
+        recipes: dict complet des recettes
+        inventory: dict {nom_ressource: int}
+
+    Returns:
+        list de dicts triés par manquant décroissant:
+            [{"resource": str, "needed": int, "acquired": int, "missing": int, "unit_value": int, "total_cost": int}]
+    """
+    aggregated = {}
+
+    for name in selected_recipe_names:
+        recipe = recipes.get(name, {})
+        for resource, data in recipe.items():
+            if resource not in aggregated:
+                aggregated[resource] = {"needed": 0, "value": data.get("value", 0)}
+            aggregated[resource]["needed"] += data.get("needed", 0)
+            # Garde la valeur unitaire la plus récente (cohérente entre recettes)
+            aggregated[resource]["value"] = data.get("value", aggregated[resource]["value"])
+
+    result = []
+    for resource, data in aggregated.items():
+        acquired = inventory.get(resource, 0)
+        missing = max(0, data["needed"] - acquired)
+        result.append({
+            "resource": resource,
+            "needed": data["needed"],
+            "acquired": acquired,
+            "missing": missing,
+            "unit_value": data["value"],
+            "total_cost": missing * data["value"],
+        })
+
+    result.sort(key=lambda x: x["missing"], reverse=True)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Axe 3 — Mise à jour automatique des prix via DofusDB
+# ---------------------------------------------------------------------------
+
+def fetch_prices_from_dofusdb(resource_name_to_id, timeout=10):
+    """Récupère les prix HDV depuis l'API DofusDB (best-effort).
+
+    Args:
+        resource_name_to_id: dict {nom_ressource: id_item (str ou int)}
+        timeout: secondes avant abandon par requête
+
+    Returns:
+        dict {nom_ressource: prix_int}  — les ressources sans prix sont absentes du résultat
+    """
+    try:
+        import requests
+    except ImportError:
+        return {}
+
+    prices = {}
+    base_url = "https://api.dofusdb.fr/items"
+
+    for resource_name, item_id in resource_name_to_id.items():
+        if not item_id:
+            continue
+        try:
+            resp = requests.get(f"{base_url}/{item_id}", timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                # DofusDB retourne avgPrice ou price selon l'endpoint
+                price = data.get("avgPrice") or data.get("price") or 0
+                if price and int(price) > 0:
+                    prices[resource_name] = int(price)
+        except Exception:
+            continue
+
+    return prices
+
+
+# ---------------------------------------------------------------------------
+# Axe 5 — Historique et statistiques de progression
+# ---------------------------------------------------------------------------
+
+HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "history.json")
+
+
+def record_snapshot(recipe_name, completed, total, kamas_manquant, filepath=None):
+    """Enregistre un instantané de progression pour une recette.
+
+    Args:
+        recipe_name: nom de la recette
+        completed: nombre de ressources complètes
+        total: nombre total de ressources
+        kamas_manquant: coût total des ressources manquantes
+        filepath: chemin optionnel (utilise HISTORY_FILE par défaut)
+    """
+    import datetime
+    filepath = filepath or HISTORY_FILE
+    history = load_history(filepath)
+
+    if recipe_name not in history:
+        history[recipe_name] = []
+
+    pct = int(completed / total * 100) if total > 0 else 100
+    history[recipe_name].append({
+        "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "completed": completed,
+        "total": total,
+        "pct": pct,
+        "kamas_manquant": kamas_manquant,
+    })
+
+    # Garde uniquement les 100 derniers snapshots par recette
+    history[recipe_name] = history[recipe_name][-100:]
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
+
+def load_history(filepath=None):
+    """Charge l'historique de progression.
+
+    Returns:
+        dict {nom_recette: [{"date": str, "completed": int, "total": int, "pct": int, "kamas_manquant": int}]}
+    """
+    filepath = filepath or HISTORY_FILE
+    if not os.path.exists(filepath):
+        return {}
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, IOError):
+        return {}

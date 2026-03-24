@@ -1,9 +1,10 @@
 '''
-    DOFUS 1.5 / Touch — Version 2.1
+    DOFUS 1.5 / Touch — Version 3.0
     Calculateur de ressources manquantes pour les crafts.
     Gestion de l'inventaire, des recettes personnalisées et des valeurs en kamas.
     Sauvegarde automatique des données en local (data/save.json).
     Import des recettes depuis l'encyclopédie Dofus Touch (crawlit).
+    Rentabilité HDV, liste de courses multi-recettes, historique de progression.
 '''
 
 import threading
@@ -22,6 +23,13 @@ from calculator_logic import (
     load_saved_data,
     save_data,
     load_dofus_touch_recipes,
+    calculate_profitability,
+    load_sell_prices,
+    save_sell_prices,
+    aggregate_shopping_list,
+    fetch_prices_from_dofusdb,
+    record_snapshot,
+    load_history,
 )
 from scripts.import_dofus_touch_data import run as run_import
 
@@ -99,16 +107,18 @@ def center_window(window):
 # ---------------------------------------------------------------------------
 
 def show_results(recipe_name, table_text, kamas_manquant, resources=None):
+    sell_prices = load_sell_prices()
+
     result_window = tk.Toplevel()
     result_window.title(f"Résultats — {recipe_name}")
-    result_window.geometry("700x580")
+    result_window.geometry("700x640")
     result_window.resizable(True, True)
     center_window(result_window)
 
     frame = ttk.Frame(result_window, padding=10)
     frame.pack(fill="both", expand=True)
 
-    text_widget = tk.Text(frame, wrap="none", width=100, height=20, font=("Courier", 10))
+    text_widget = tk.Text(frame, wrap="none", width=100, height=18, font=("Courier", 10))
     text_widget.insert("1.0", table_text)
     text_widget.config(state="disabled")
 
@@ -120,6 +130,8 @@ def show_results(recipe_name, table_text, kamas_manquant, resources=None):
     sy.grid(row=0, column=1, sticky="ns")
     sx.grid(row=1, column=0, sticky="ew")
 
+    row_idx = 2
+
     if resources is not None:
         completed, total, pct = get_recipe_completion(resources, inventory)
         bar = _completion_bar(pct)
@@ -127,14 +139,49 @@ def show_results(recipe_name, table_text, kamas_manquant, resources=None):
             frame,
             text=f"Complétion : {bar} {pct}%  ({completed} / {total} ressources complètes)",
             font=("Courier", 11),
-        ).grid(row=2, column=0, columnspan=2, pady=5)
+        ).grid(row=row_idx, column=0, columnspan=2, pady=5)
+        row_idx += 1
 
     kamas_str = f"{kamas_manquant:,}".replace(",", " ")
-    ttk.Label(frame, text=f"Il me manque : {kamas_str} kamas", font=("Arial", 12, "bold")).grid(
-        row=3, column=0, columnspan=2, pady=5
+    ttk.Label(frame, text=f"Coût de craft : {kamas_str} kamas", font=("Arial", 12, "bold")).grid(
+        row=row_idx, column=0, columnspan=2, pady=2
     )
+    row_idx += 1
+
+    # --- Rentabilité HDV ---
+    profit_frame = ttk.LabelFrame(frame, text="Rentabilité HDV", padding=5)
+    profit_frame.grid(row=row_idx, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
+    row_idx += 1
+
+    profit_label = ttk.Label(profit_frame, text="", font=("Arial", 11))
+    profit_label.pack(side="right", padx=10)
+
+    sell_var = tk.StringVar(value=str(sell_prices.get(recipe_name, "")))
+    ttk.Label(profit_frame, text="Prix de vente HDV (kamas) :").pack(side="left", padx=5)
+    sell_entry = ttk.Entry(profit_frame, textvariable=sell_var, width=15)
+    sell_entry.pack(side="left", padx=5)
+
+    def _update_profitability(*_):
+        try:
+            sell_price = int(sell_var.get().replace(" ", ""))
+        except ValueError:
+            profit_label.config(text="")
+            return
+        sell_prices[recipe_name] = sell_price
+        save_sell_prices(sell_prices)
+        result = calculate_profitability(kamas_manquant, sell_price)
+        profit_str = f"{result['profit']:+,}".replace(",", " ")
+        color = "success" if result["is_profitable"] else "danger"
+        profit_label.config(
+            text=f"Bénéfice : {profit_str} kamas  ({result['margin_pct']:+.1f}%)",
+            bootstyle=color,
+        )
+
+    sell_var.trace_add("write", _update_profitability)
+    _update_profitability()
+
     ttk.Button(frame, text="Fermer", command=result_window.destroy, bootstyle="danger").grid(
-        row=4, column=0, columnspan=2, pady=10
+        row=row_idx, column=0, columnspan=2, pady=10
     )
 
     frame.rowconfigure(0, weight=1)
@@ -203,6 +250,14 @@ def manage_inventory():
             for resource_name, quantity in updates:
                 inventory[resource_name] = quantity
             save_data(inventory, recipes, custom_recipe_names)
+            # Enregistrer un snapshot pour chaque recette (historique de progression)
+            for rname, res in recipes.items():
+                _, kamas = calculate_missing_resources(res, inventory)
+                completed, total, _ = get_recipe_completion(res, inventory)
+                try:
+                    record_snapshot(rname, completed, total, kamas)
+                except Exception:
+                    pass
             messagebox.showinfo("Succès", "Inventaire mis à jour et sauvegardé.")
             win.destroy()
         except ValueError as e:
@@ -289,6 +344,237 @@ def calculate_all_recipes():
 
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
+
+
+# ---------------------------------------------------------------------------
+# Axe 2 — Liste de courses multi-recettes
+# ---------------------------------------------------------------------------
+
+def show_shopping_list():
+    """Fenêtre de sélection de recettes et affichage de la liste de courses agrégée."""
+    win = tk.Toplevel()
+    win.title("Liste de courses multi-recettes")
+    win.geometry("900x650")
+    win.resizable(True, True)
+    center_window(win)
+
+    frame = ttk.Frame(win, padding=10)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text="Sélectionnez les recettes à inclure :", font=("Arial", 12, "bold")).pack(pady=(5, 2))
+
+    list_frame = ttk.Frame(frame)
+    list_frame.pack(fill="both", expand=False, padx=5, pady=5)
+
+    lb = tk.Listbox(list_frame, selectmode="multiple", font=("Courier", 10), height=10, exportselection=False)
+    for name in sorted(recipes.keys()):
+        lb.insert("end", name)
+    sb = ttk.Scrollbar(list_frame, orient="vertical", command=lb.yview)
+    lb.config(yscrollcommand=sb.set)
+    lb.pack(side="left", fill="both", expand=True)
+    sb.pack(side="right", fill="y")
+
+    result_text = tk.Text(frame, wrap="none", font=("Courier", 10), height=18, state="disabled")
+    sy2 = ttk.Scrollbar(frame, orient="vertical", command=result_text.yview)
+    sx2 = ttk.Scrollbar(frame, orient="horizontal", command=result_text.xview)
+    result_text.config(yscrollcommand=sy2.set, xscrollcommand=sx2.set)
+
+    total_label = ttk.Label(frame, text="", font=("Arial", 11, "bold"))
+
+    def _compute():
+        selected_indices = lb.curselection()
+        selected_names = [lb.get(i) for i in selected_indices]
+        if not selected_names:
+            messagebox.showwarning("Avertissement", "Sélectionnez au moins une recette.")
+            return
+        items = aggregate_shopping_list(selected_names, recipes, inventory)
+        total_cost = sum(it["total_cost"] for it in items)
+
+        from tabulate import tabulate
+        rows = [
+            [
+                it["resource"].replace("_", " "),
+                it["needed"],
+                it["acquired"],
+                it["missing"],
+                f"{it['unit_value']:,}".replace(",", " "),
+                f"{it['total_cost']:,}".replace(",", " "),
+            ]
+            for it in items
+        ]
+        table = tabulate(rows, headers=["Ressource", "Requis", "Acquis", "Manquant", "Val. unit.", "Coût total"], tablefmt="grid")
+
+        result_text.config(state="normal")
+        result_text.delete("1.0", "end")
+        result_text.insert("1.0", table)
+        result_text.config(state="disabled")
+        total_str = f"{total_cost:,}".replace(",", " ")
+        total_label.config(text=f"Coût total estimé : {total_str} kamas")
+
+    ttk.Button(frame, text="Calculer la liste de courses", command=_compute, bootstyle="primary").pack(pady=5)
+
+    result_text.pack(side="left", fill="both", expand=True, padx=(5, 0), pady=5)
+    sy2.pack(side="right", fill="y", pady=5)
+    sx2.pack(fill="x", padx=5)
+
+    total_label.pack(pady=2)
+    ttk.Button(frame, text="Fermer", command=win.destroy, bootstyle="danger").pack(pady=5)
+
+
+# ---------------------------------------------------------------------------
+# Axe 3 — Mise à jour automatique des prix via DofusDB
+# ---------------------------------------------------------------------------
+
+def update_prices_from_dofusdb():
+    """Fenêtre de mise à jour des prix depuis l'API DofusDB."""
+    win = tk.Toplevel()
+    win.title("Mise à jour des prix DofusDB")
+    win.geometry("600x420")
+    win.resizable(True, True)
+    center_window(win)
+
+    frame = ttk.Frame(win, padding=10)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(
+        frame,
+        text="Mise à jour automatique des prix depuis DofusDB",
+        font=("Arial", 12, "bold"),
+    ).pack(pady=(10, 5))
+    ttk.Label(
+        frame,
+        text="Seules les ressources avec un identifiant connu seront mises à jour.",
+        font=("Arial", 10),
+        wraplength=550,
+    ).pack(pady=(0, 10))
+
+    log_text = tk.Text(frame, wrap="word", width=70, height=14, font=("Courier", 10), state="disabled")
+    sy = ttk.Scrollbar(frame, orient="vertical", command=log_text.yview)
+    log_text.config(yscrollcommand=sy.set)
+    log_text.pack(side="left", fill="both", expand=True, padx=(5, 0), pady=5)
+    sy.pack(side="right", fill="y", pady=5)
+
+    close_btn = ttk.Button(frame, text="Fermer", command=win.destroy, bootstyle="danger", state="disabled")
+    close_btn.pack(pady=10)
+
+    def append_log(msg):
+        log_text.config(state="normal")
+        log_text.insert("end", msg + "\n")
+        log_text.see("end")
+        log_text.config(state="disabled")
+
+    def do_fetch():
+        # Collecter les ids depuis les recettes chargées
+        resource_name_to_id = {}
+        for res_dict in recipes.values():
+            for rname, rdata in res_dict.items():
+                rid = rdata.get("id", "")
+                if rid and rname not in resource_name_to_id:
+                    resource_name_to_id[rname] = rid
+
+        win.after(0, lambda: append_log(f"Recherche de prix pour {len(resource_name_to_id)} ressources…"))
+        prices = fetch_prices_from_dofusdb(resource_name_to_id)
+
+        if not prices:
+            win.after(0, lambda: append_log("Aucun prix récupéré. L'API DofusDB est peut-être indisponible."))
+            win.after(0, lambda: close_btn.config(state="normal"))
+            return
+
+        updated = 0
+        for rname, price in prices.items():
+            for recipe in recipes.values():
+                if rname in recipe:
+                    recipe[rname]["value"] = price
+                    updated += 1
+                    break
+
+        save_data(inventory, recipes, custom_recipe_names)
+        win.after(0, lambda: append_log(f"✓ {updated} ressources mises à jour avec les prix DofusDB."))
+        win.after(0, lambda: close_btn.config(state="normal"))
+
+    threading.Thread(target=do_fetch, daemon=True).start()
+
+
+# ---------------------------------------------------------------------------
+# Axe 5 — Historique et statistiques de progression
+# ---------------------------------------------------------------------------
+
+def show_stats():
+    """Affiche l'historique de progression sous forme de graphiques matplotlib."""
+    history = load_history()
+    if not history:
+        messagebox.showinfo("Historique", "Aucun historique enregistré pour l'instant.\nSauvegardez votre inventaire pour créer des entrées.")
+        return
+
+    try:
+        import matplotlib
+        matplotlib.use("TkAgg")
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    except ImportError:
+        messagebox.showerror("Erreur", "matplotlib n'est pas installé.\nInstallez-le avec : pip install matplotlib")
+        return
+
+    win = tk.Toplevel()
+    win.title("Historique de progression")
+    win.geometry("950x650")
+    win.resizable(True, True)
+    center_window(win)
+
+    frame = ttk.Frame(win, padding=10)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text="Sélectionnez une recette :", font=("Arial", 12, "bold")).pack(pady=(5, 2))
+
+    recipe_options = [r for r in history if history[r]]
+    combo = ttk.Combobox(frame, values=recipe_options, state="readonly", width=60)
+    if recipe_options:
+        combo.current(0)
+    combo.pack(pady=5)
+
+    chart_frame = ttk.Frame(frame)
+    chart_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+    fig.tight_layout(pad=3)
+    canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+    canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def _plot(recipe_name):
+        snapshots = history.get(recipe_name, [])
+        if not snapshots:
+            return
+        dates = [s["date"] for s in snapshots]
+        pcts = [s["pct"] for s in snapshots]
+        kamas = [s["kamas_manquant"] for s in snapshots]
+
+        for ax in axes:
+            ax.clear()
+
+        axes[0].plot(range(len(pcts)), pcts, marker="o", color="#4CAF50")
+        axes[0].set_title(f"Taux de complétion — {recipe_name}", fontsize=9)
+        axes[0].set_ylabel("Complétion (%)")
+        axes[0].set_ylim(0, 105)
+        axes[0].set_xticks(range(len(dates)))
+        axes[0].set_xticklabels(dates, rotation=45, ha="right", fontsize=7)
+
+        axes[1].bar(range(len(kamas)), kamas, color="#F44336")
+        axes[1].set_title(f"Kamas manquants — {recipe_name}", fontsize=9)
+        axes[1].set_ylabel("Kamas")
+        axes[1].set_xticks(range(len(dates)))
+        axes[1].set_xticklabels(dates, rotation=45, ha="right", fontsize=7)
+
+        fig.tight_layout(pad=2)
+        canvas.draw()
+
+    def _on_select(event=None):
+        _plot(combo.get())
+
+    combo.bind("<<ComboboxSelected>>", _on_select)
+    if recipe_options:
+        _plot(recipe_options[0])
+
+    ttk.Button(frame, text="Fermer", command=win.destroy, bootstyle="danger").pack(pady=5)
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +704,7 @@ def main_gui():
 
     # ---- Fenêtre principale ----
     root = ttk.Window(themename="darkly")
-    root.title("Dofus Touch Calculator v2.1")
+    root.title("Dofus Touch Calculator v3.0")
     root.geometry("1100x800")
     root.resizable(False, False)
 
@@ -470,7 +756,7 @@ def main_gui():
 
     # Boutons — ligne 1 : actions principales
     btn_frame_1 = ttk.Frame(root, style="BrownFrame.TFrame", padding=5)
-    btn_frame_1.place(relx=0.5, rely=0.62, anchor="center", width=1050)
+    btn_frame_1.place(relx=0.5, rely=0.60, anchor="center", width=1050)
 
     row1 = [
         ("Gérer l'inventaire",          manage_inventory,        0),
@@ -484,12 +770,26 @@ def main_gui():
             row=0, column=col, padx=8
         )
 
-    # Boutons — ligne 2 : import encyclopédie
+    # Boutons — ligne 2 : nouvelles fonctionnalités
     btn_frame_2 = ttk.Frame(root, style="BrownFrame.TFrame", padding=5)
-    btn_frame_2.place(relx=0.5, rely=0.72, anchor="center")
+    btn_frame_2.place(relx=0.5, rely=0.70, anchor="center", width=1050)
+
+    row2 = [
+        ("Liste de courses",              show_shopping_list,          0),
+        ("Mise à jour prix DofusDB",      update_prices_from_dofusdb,  1),
+        ("Statistiques / Historique",     show_stats,                  2),
+    ]
+    for label, cmd, col in row2:
+        ttk.Button(btn_frame_2, text=label, command=cmd, width=30, style="Brown.TButton").grid(
+            row=0, column=col, padx=8
+        )
+
+    # Boutons — ligne 3 : import encyclopédie
+    btn_frame_3 = ttk.Frame(root, style="BrownFrame.TFrame", padding=5)
+    btn_frame_3.place(relx=0.5, rely=0.80, anchor="center")
 
     ttk.Button(
-        btn_frame_2,
+        btn_frame_3,
         text="Importer / Mettre à jour les recettes Dofus Touch",
         command=on_import_data,
         width=50,
@@ -503,7 +803,7 @@ def main_gui():
             root,
             text=f"{nb_crawlit} recettes Dofus Touch chargées depuis l'encyclopédie",
             font=("Arial", 10),
-        ).place(relx=0.5, rely=0.78, anchor="center")
+        ).place(relx=0.5, rely=0.86, anchor="center")
 
     root.mainloop()
 

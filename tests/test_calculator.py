@@ -15,6 +15,12 @@ from calculator_logic import (
     load_saved_data,
     save_data,
     load_dofus_touch_recipes,
+    calculate_profitability,
+    load_sell_prices,
+    save_sell_prices,
+    aggregate_shopping_list,
+    record_snapshot,
+    load_history,
 )
 
 
@@ -464,10 +470,11 @@ class TestImportConversion:
             ],
         }
         result = self._convert(item)
-        assert result == {
-            "Ventouse du Kralamoure géant": {"needed": 8, "value": 0},
-            "Bave de Boufton": {"needed": 4, "value": 0},
-        }
+        assert result is not None
+        assert result["Ventouse du Kralamoure géant"]["needed"] == 8
+        assert result["Ventouse du Kralamoure géant"]["value"] == 0
+        assert result["Bave de Boufton"]["needed"] == 4
+        assert result["Bave de Boufton"]["value"] == 0
 
     def test_item_without_recipe_returns_none(self):
         item = {"name": "Objet sans recette", "recipe": []}
@@ -537,3 +544,217 @@ class TestImportConversion:
         with open(output, encoding="utf-8") as f:
             saved = json_mod.load(f)
         assert "Chapeau Test" in saved
+
+    def test_id_stored_in_resource(self):
+        """Vérifie que l'id est stocké dans chaque ressource après modification."""
+        from scripts.import_dofus_touch_data import _convert_item
+        item = {
+            "name": "Épée Test",
+            "recipe": [
+                {"Res A": {"quantity": "5", "id": 42}},
+            ],
+        }
+        result = _convert_item(item)
+        assert result is not None
+        assert result["Res A"]["id"] == "42"
+
+    def test_id_defaults_to_empty_string_if_missing(self):
+        """Vérifie que l'id vaut '' si absent."""
+        from scripts.import_dofus_touch_data import _convert_item
+        item = {
+            "name": "Épée Test",
+            "recipe": [{"Res A": {"quantity": "5"}}],
+        }
+        result = _convert_item(item)
+        assert result["Res A"]["id"] == ""
+
+
+# ---------------------------------------------------------------------------
+# calculate_profitability
+# ---------------------------------------------------------------------------
+
+class TestCalculateProfitability:
+
+    def test_profitable_craft(self):
+        result = calculate_profitability(100_000, 150_000)
+        assert result["profit"] == 50_000
+        assert result["is_profitable"] is True
+        assert result["margin_pct"] == 50.0
+
+    def test_losing_craft(self):
+        result = calculate_profitability(200_000, 150_000)
+        assert result["profit"] == -50_000
+        assert result["is_profitable"] is False
+        assert result["margin_pct"] < 0
+
+    def test_break_even(self):
+        result = calculate_profitability(100_000, 100_000)
+        assert result["profit"] == 0
+        assert result["is_profitable"] is False
+        assert result["margin_pct"] == 0.0
+
+    def test_zero_craft_cost_no_division(self):
+        result = calculate_profitability(0, 50_000)
+        assert result["profit"] == 50_000
+        assert result["margin_pct"] == 0.0
+
+    def test_margin_rounding(self):
+        result = calculate_profitability(3, 4)
+        assert result["margin_pct"] == round(100 / 3, 1)
+
+
+# ---------------------------------------------------------------------------
+# load_sell_prices / save_sell_prices
+# ---------------------------------------------------------------------------
+
+class TestSellPricesPersistence:
+
+    def test_returns_empty_when_file_missing(self, tmp_path):
+        filepath = str(tmp_path / "nonexistent.json")
+        result = load_sell_prices(filepath=filepath)
+        assert result == {}
+
+    def test_returns_empty_on_corrupted_file(self, tmp_path):
+        filepath = str(tmp_path / "prices.json")
+        with open(filepath, "w") as f:
+            f.write("{{invalid}}")
+        result = load_sell_prices(filepath=filepath)
+        assert result == {}
+
+    def test_roundtrip(self, tmp_path):
+        filepath = str(tmp_path / "prices.json")
+        prices = {"Cape Cérémoniale": 500_000, "Sandales": 120_000}
+        save_sell_prices(prices, filepath=filepath)
+        loaded = load_sell_prices(filepath=filepath)
+        assert loaded == prices
+
+    def test_creates_directory(self, tmp_path):
+        filepath = str(tmp_path / "sub" / "prices.json")
+        save_sell_prices({"r": 1}, filepath=filepath)
+        assert os.path.exists(filepath)
+
+
+# ---------------------------------------------------------------------------
+# aggregate_shopping_list
+# ---------------------------------------------------------------------------
+
+class TestAggregateShoppingList:
+
+    RECIPES = {
+        "Cape": {
+            "orbe_irisé": {"needed": 10, "value": 1000},
+            "andésite": {"needed": 5, "value": 500},
+        },
+        "Sandales": {
+            "orbe_irisé": {"needed": 3, "value": 1000},
+            "bois": {"needed": 8, "value": 200},
+        },
+    }
+
+    def test_single_recipe_no_inventory(self):
+        items = aggregate_shopping_list(["Cape"], self.RECIPES, {})
+        assert any(i["resource"] == "orbe_irisé" and i["needed"] == 10 for i in items)
+
+    def test_two_recipes_aggregates_shared_resource(self):
+        items = aggregate_shopping_list(["Cape", "Sandales"], self.RECIPES, {})
+        orbe = next(i for i in items if i["resource"] == "orbe_irisé")
+        assert orbe["needed"] == 13
+
+    def test_inventory_reduces_missing(self):
+        inv = {"orbe_irisé": 5}
+        items = aggregate_shopping_list(["Cape"], self.RECIPES, inv)
+        orbe = next(i for i in items if i["resource"] == "orbe_irisé")
+        assert orbe["missing"] == 5
+        assert orbe["acquired"] == 5
+
+    def test_fully_stocked_resource_has_zero_missing(self):
+        inv = {"orbe_irisé": 20}
+        items = aggregate_shopping_list(["Cape"], self.RECIPES, inv)
+        orbe = next(i for i in items if i["resource"] == "orbe_irisé")
+        assert orbe["missing"] == 0
+
+    def test_sorted_by_missing_descending(self):
+        inv = {"orbe_irisé": 9}  # manque 1 orbe, manque 5 andésite
+        items = aggregate_shopping_list(["Cape"], self.RECIPES, inv)
+        missings = [i["missing"] for i in items]
+        assert missings == sorted(missings, reverse=True)
+
+    def test_empty_selection_returns_empty(self):
+        items = aggregate_shopping_list([], self.RECIPES, {})
+        assert items == []
+
+    def test_unknown_recipe_name_skipped(self):
+        items = aggregate_shopping_list(["Recette Inconnue"], self.RECIPES, {})
+        assert items == []
+
+    def test_total_cost_computed(self):
+        items = aggregate_shopping_list(["Cape"], self.RECIPES, {})
+        orbe = next(i for i in items if i["resource"] == "orbe_irisé")
+        assert orbe["total_cost"] == orbe["missing"] * orbe["unit_value"]
+
+
+# ---------------------------------------------------------------------------
+# record_snapshot / load_history
+# ---------------------------------------------------------------------------
+
+class TestHistory:
+
+    def test_load_returns_empty_when_missing(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        result = load_history(filepath=filepath)
+        assert result == {}
+
+    def test_load_returns_empty_on_corrupted_file(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        with open(filepath, "w") as f:
+            f.write("{bad}")
+        result = load_history(filepath=filepath)
+        assert result == {}
+
+    def test_record_creates_entry(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        record_snapshot("Cape", 5, 10, 50_000, filepath=filepath)
+        history = load_history(filepath=filepath)
+        assert "Cape" in history
+        assert len(history["Cape"]) == 1
+        entry = history["Cape"][0]
+        assert entry["completed"] == 5
+        assert entry["total"] == 10
+        assert entry["pct"] == 50
+        assert entry["kamas_manquant"] == 50_000
+
+    def test_multiple_snapshots_accumulated(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        record_snapshot("Cape", 3, 10, 70_000, filepath=filepath)
+        record_snapshot("Cape", 7, 10, 30_000, filepath=filepath)
+        history = load_history(filepath=filepath)
+        assert len(history["Cape"]) == 2
+
+    def test_capped_at_100_entries(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        for i in range(110):
+            record_snapshot("Cape", i % 11, 10, 1000, filepath=filepath)
+        history = load_history(filepath=filepath)
+        assert len(history["Cape"]) == 100
+
+    def test_multiple_recipes_tracked_independently(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        record_snapshot("Cape", 5, 10, 50_000, filepath=filepath)
+        record_snapshot("Sandales", 2, 6, 20_000, filepath=filepath)
+        history = load_history(filepath=filepath)
+        assert "Cape" in history
+        assert "Sandales" in history
+        assert len(history["Cape"]) == 1
+        assert len(history["Sandales"]) == 1
+
+    def test_pct_zero_when_nothing_done(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        record_snapshot("Cape", 0, 10, 100_000, filepath=filepath)
+        entry = load_history(filepath=filepath)["Cape"][0]
+        assert entry["pct"] == 0
+
+    def test_pct_100_when_complete(self, tmp_path):
+        filepath = str(tmp_path / "history.json")
+        record_snapshot("Cape", 10, 10, 0, filepath=filepath)
+        entry = load_history(filepath=filepath)["Cape"][0]
+        assert entry["pct"] == 100
