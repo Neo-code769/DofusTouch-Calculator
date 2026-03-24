@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "modified=$(git -C /home/user/DofusTouch-Calculator status --porcelain 2>/dev/null | grep -vE 'README\\.md|TUTORIEL\\.txt|\\.pyc|__pycache__' | grep -v '^$'); if [ -n \"$modified\" ]; then echo '{\"systemMessage\": \"Rappel : des fichiers ont ete modifies. Mets a jour README.md et TUTORIEL.txt si les changements impactent les fonctionnalites ou l utilisation du projet.\"}'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
